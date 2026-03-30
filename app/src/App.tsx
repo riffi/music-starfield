@@ -15,7 +15,18 @@ import { useStarfield } from './hooks/useStarfield'
 function App() {
   const starfieldRef = useRef<HTMLCanvasElement | null>(null)
   const orreryRef = useRef<SVGCircleElement | null>(null)
-  const viewportRef = useRef({ x: 0, y: 0, k: 1, focusX: 0, focusY: 0 })
+  const viewportRef = useRef({
+    x: 0,
+    y: 0,
+    k: 1,
+    focusX: 0,
+    focusY: 0,
+    activeRootId: null,
+    activeRootColor: null,
+    activeRootX: 0,
+    activeRootY: 0,
+    activeRootGlow: 0,
+  })
   const audioDataRef = useRef({ bass: 0, energy: 0 })
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)

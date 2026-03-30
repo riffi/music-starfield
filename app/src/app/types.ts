@@ -46,4 +46,9 @@ export type ViewportState = {
   k: number
   focusX: number
   focusY: number
+  activeRootId: string | null
+  activeRootColor: string | null
+  activeRootX: number
+  activeRootY: number
+  activeRootGlow: number
 }

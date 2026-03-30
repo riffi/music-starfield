@@ -23,6 +23,13 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
   const stationPulseIdsRef = useRef<Set<string>>(new Set())
   const flowEdgeKeysRef = useRef<Set<string>>(new Set())
 
+  function withAlpha(color: string, alpha: number) {
+    const parsed = d3.color(color)
+    if (!parsed) return color
+    parsed.opacity = alpha
+    return parsed.formatRgb()
+  }
+
   useEffect(() => {
     const station = playing && currentStationId ? atlasData.stationMap[currentStationId] : undefined
     stationPulseIdsRef.current = pulseNodeIdsForPlayingStation(station, selectedId)
@@ -56,7 +63,10 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
               grp.select('circle.gring-mid-rim').attr('opacity', 0)
             }
             if (d.level <= 2) grp.select('circle.ncore').attr('r', baseR * 0.38)
-            if (d.level === 3) grp.select('circle.nbody').attr('r', baseR)
+            if (d.level === 3) {
+              grp.select('circle.nbody').attr('r', baseR)
+              grp.select('circle.ncold').attr('r', baseR * 0.42)
+            }
             return
           }
 
@@ -94,6 +104,7 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
           if (d.level === 3) {
             const bodyScale = 1 + Math.sin(pt * 1.02 + phase) * 0.18 + bass * 0.08 + energy * 0.1
             grp.select('circle.nbody').attr('r', baseR * bodyScale)
+            grp.select('circle.ncold').attr('r', baseR * 0.42 * (1 + energy * 0.08))
           }
         })
 
@@ -179,6 +190,7 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
     flowGlow.append('feMerge').append('feMergeNode').attr('in', 'blur')
 
     const g = svg.append('g')
+    const constellationG = g.append('g')
     const linkG = g.append('g')
     const flowG = g.append('g')
     const nodeG = g.append('g')
@@ -214,7 +226,11 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
     }
     function nr(node: RefNode) {
       if (node.level === 1) return rootRadiusById.get(node.id) ?? 27
-      return node.level === 2 ? 16 : 9
+      return node.level === 2 ? 15 : 6
+    }
+    function level3ColdColor(node: RefNode) {
+      const rootColor = getL1(node)?.color ?? '#a8cfff'
+      return d3.interpolateRgb(rootColor, '#cfe2ff')(0.72)
     }
     function getVisible() {
       const visibleNodes = nodes.filter((node) => {
@@ -234,12 +250,34 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       })
       return { visibleNodes, visibleLinks }
     }
+    function buildConstellationLinks(visibleNodes: RefNode[]) {
+      const visibleIds = new Set(visibleNodes.map((node) => node.id))
+      const constellationLinks: RefLink[] = []
+
+      for (const root of rootNodes) {
+        const visibleLevel2 = (childrenByParent[root.id] ?? []).filter((node) => visibleIds.has(node.id))
+        for (let i = 0; i < visibleLevel2.length - 1; i += 1) {
+          constellationLinks.push({ source: visibleLevel2[i].id, target: visibleLevel2[i + 1].id })
+        }
+      }
+
+      for (const [parentId, siblings] of Object.entries(childrenByParent)) {
+        const parent = nodeMap[parentId]
+        if (!parent || parent.level !== 2 || !visibleIds.has(parent.id)) continue
+        const visibleLevel3 = siblings.filter((node) => visibleIds.has(node.id))
+        for (let i = 0; i < visibleLevel3.length - 1; i += 1) {
+          constellationLinks.push({ source: visibleLevel3[i].id, target: visibleLevel3[i + 1].id })
+        }
+      }
+
+      return constellationLinks
+    }
     function placeLevel3Fan(child: RefNode, childX: number, childY: number, rootX: number, rootY: number, sectorSpan: number, level2SiblingCount: number, visibleIds: Set<string>) {
       const level3Children = (childrenByParent[child.id] ?? []).filter((g) => visibleIds.has(g.id))
       const l3Count = level3Children.length
       if (l3Count === 0) return [] as { id: string; x: number; y: number }[]
       const rootDistance = Math.hypot(childX - rootX, childY - rootY)
-      const level3Orbit = Math.max(96, rootDistance * 0.56) + Math.max(0, l3Count - 2) * 16 + Math.max(0, level2SiblingCount - 5) * 3
+      const level3Orbit = Math.max(64, rootDistance * 0.38) + Math.max(0, l3Count - 2) * 10 + Math.max(0, level2SiblingCount - 5) * 2
       const branchAngle = Math.atan2(childY - rootY, childX - rootX)
       const branchDirX = Math.cos(branchAngle)
       const branchDirY = Math.sin(branchAngle)
@@ -252,7 +290,7 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       const outwardDirY = Math.sin(outwardAngle)
       const outwardTanX = Math.cos(outwardAngle + Math.PI / 2)
       const outwardTanY = Math.sin(outwardAngle + Math.PI / 2)
-      const level3Span = Math.min(Math.PI * 0.9, Math.max(sectorSpan * 0.76, 0.46 + l3Count * 0.2))
+      const level3Span = Math.min(Math.PI * 0.72, Math.max(sectorSpan * 0.52, 0.34 + l3Count * 0.14))
       let level3TangentLimit = Math.tan(level3Span / 2) * level3Orbit * 0.86
       const l3Radius = 9
       const minL3Gap = l3Radius * 2 + 40
@@ -372,6 +410,7 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       .force('center', d3.forceCenter())
 
     function syncGraphDom() {
+      constellationG.selectAll<SVGLineElement, d3.SimulationLinkDatum<RefNode>>('line.edge-constellation').attr('x1', (d) => (d.source as RefNode).x ?? 0).attr('y1', (d) => (d.source as RefNode).y ?? 0).attr('x2', (d) => (d.target as RefNode).x ?? 0).attr('y2', (d) => (d.target as RefNode).y ?? 0)
       linkG.selectAll<SVGLineElement, d3.SimulationLinkDatum<RefNode>>('line.edge').attr('x1', (d) => (d.source as RefNode).x ?? 0).attr('y1', (d) => (d.source as RefNode).y ?? 0).attr('x2', (d) => (d.target as RefNode).x ?? 0).attr('y2', (d) => (d.target as RefNode).y ?? 0)
       flowG.selectAll<SVGLineElement, d3.SimulationLinkDatum<RefNode>>('line.edge-flow').attr('x1', (d) => (d.source as RefNode).x ?? 0).attr('y1', (d) => (d.source as RefNode).y ?? 0).attr('x2', (d) => (d.target as RefNode).x ?? 0).attr('y2', (d) => (d.target as RefNode).y ?? 0)
       nodeG.selectAll<SVGGElement, RefNode>('g.nd').attr('transform', (d) => `translate(${d.x ?? 0},${d.y ?? 0})`)
@@ -380,11 +419,14 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
     simulation.on('tick', syncGraphDom)
 
     function deselect() {
-      nodeG.selectAll<SVGGElement, RefNode>('g.nd').select<SVGCircleElement>('circle.nbody').attr('stroke-width', (d) => (d.level === 1 ? 2 : 1.5)).attr('stroke-opacity', 1).attr('fill', (d) => `${nodeColor(d)}20`).attr('filter', (d) => (d.level === 1 ? 'url(#glow6)' : 'url(#glow3)'))
+      nodeG.selectAll<SVGGElement, RefNode>('g.nd').select<SVGCircleElement>('circle.nbody').attr('stroke-width', (d) => (d.level === 1 ? 2 : d.level === 2 ? 1.5 : 1.1)).attr('stroke-opacity', 1).attr('fill', (d) => (d.level === 3 ? withAlpha(level3ColdColor(d), 0.13) : withAlpha(nodeColor(d), 0.13))).attr('stroke', (d) => (d.level === 3 ? level3ColdColor(d) : nodeColor(d))).attr('filter', (d) => (d.level === 1 ? 'url(#glow6)' : 'url(#glow3)'))
       setSelectedId(null)
     }
     function highlight(id: string) {
-      nodeG.selectAll<SVGGElement, RefNode>('g.nd').select<SVGCircleElement>('circle.nbody').attr('stroke-width', (d) => (d.id === id ? (d.level === 1 ? 3.6 : d.level === 2 ? 3.1 : 2.8) : d.level === 1 ? 2 : 1.5)).attr('stroke-opacity', (d) => (d.id === id ? 1 : 0.92)).attr('fill', (d) => (d.id === id ? `${nodeColor(d)}72` : `${nodeColor(d)}20`)).attr('filter', (d) => (d.id !== id ? (d.level === 1 ? 'url(#glow6)' : 'url(#glow3)') : d.level === 1 ? 'url(#glow10)' : 'url(#glow6)'))
+      nodeG.selectAll<SVGGElement, RefNode>('g.nd').select<SVGCircleElement>('circle.nbody').attr('stroke-width', (d) => (d.id === id ? (d.level === 1 ? 3.6 : d.level === 2 ? 3.1 : 2.2) : d.level === 1 ? 2 : d.level === 2 ? 1.5 : 1.1)).attr('stroke-opacity', (d) => (d.id === id ? 1 : 0.92)).attr('fill', (d) => {
+        if (d.level === 3) return d.id === id ? withAlpha(level3ColdColor(d), 0.31) : withAlpha(level3ColdColor(d), 0.13)
+        return d.id === id ? withAlpha(nodeColor(d), 0.45) : withAlpha(nodeColor(d), 0.13)
+      }).attr('stroke', (d) => (d.level === 3 ? level3ColdColor(d) : nodeColor(d))).attr('filter', (d) => (d.id !== id ? (d.level === 1 ? 'url(#glow6)' : 'url(#glow3)') : d.level === 1 ? 'url(#glow10)' : 'url(#glow6)'))
     }
     function refreshPanel(node: RefNode) {
       setSelectedId(node.id)
@@ -417,6 +459,7 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
     function update(initial: boolean) {
       if (!initial) simulation.stop()
       const { visibleNodes, visibleLinks } = getVisible()
+      const constellationLinks = buildConstellationLinks(visibleNodes)
       const visibleIds = new Set(visibleNodes.map((n) => n.id))
       const activeRootId = getActiveRootId()
       const activeLevel2Id = getActiveLevel2Id(activeRootId)
@@ -425,6 +468,15 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       const rootDimmingChanged = initial || activeRootId !== previousGraphActiveRootId
       previousGraphActiveRootId = activeRootId
       previousGraphActiveLevel2Id = activeLevel2Id
+      const activeRootTarget = activeRootId ? targets.get(activeRootId) : null
+      viewportRef.current = {
+        ...viewportRef.current,
+        activeRootId,
+        activeRootColor: activeRootId ? nodeMap[activeRootId]?.color ?? null : null,
+        activeRootX: activeRootTarget?.x ?? width() * 0.5,
+        activeRootY: activeRootTarget?.y ?? height() * 0.5,
+        activeRootGlow: activeRootId ? 1 : 0,
+      }
 
       simulation.force('center', d3.forceCenter(width() / 2, height() / 2))
       simulation.force('orbit-x', d3.forceX<RefNode>((d) => targets.get(d.id)?.x ?? width() / 2).strength((d) => (d.level === 1 ? 0.3 : d.level === 2 ? 0.76 : 0.68)))
@@ -451,6 +503,24 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       const activeLinkSelection = linkSelection.merge(enteredLinks)
       linkSelection.exit().transition().duration(300).style('opacity', 0).remove()
 
+      const constellationSelection = constellationG.selectAll<SVGLineElement, RefLink>('line.edge-constellation').data(constellationLinks, (d) => `${typeof d.source === 'object' ? d.source.id : d.source}>${typeof d.target === 'object' ? d.target.id : d.target}`)
+      const enteredConstellations = constellationSelection.enter().append('line')
+        .attr('class', 'edge-constellation')
+        .style('stroke', (d) => {
+          const source = typeof d.source === 'object' ? d.source : nodeMap[d.source]
+          return d3.color(nodeColor(source))?.copy({ opacity: 0.3 }).formatRgb() ?? nodeColor(source)
+        })
+        .style('stroke-opacity', 0.1)
+        .style('stroke-width', (d) => ((typeof d.source === 'object' ? d.source : nodeMap[d.source]).level === 2 ? 0.55 : 0.42))
+        .style('stroke-linecap', 'round')
+        .style('stroke-dasharray', '1.5,5.5')
+        .style('opacity', 0)
+        .transition()
+        .duration(450)
+        .style('opacity', 1)
+      const activeConstellationSelection = constellationSelection.merge(enteredConstellations)
+      constellationSelection.exit().transition().duration(260).style('opacity', 0).remove()
+
       const flowSelection = flowG.selectAll<SVGLineElement, RefLink>('line.edge-flow').data(visibleLinks, (d) => `${typeof d.source === 'object' ? d.source.id : d.source}>${typeof d.target === 'object' ? d.target.id : d.target}`)
       flowSelection.enter().append('line').attr('class', 'edge-flow').style('stroke', (d) => nodeColor(typeof d.target === 'object' ? d.target : nodeMap[d.target])).style('stroke-linecap', 'round').style('stroke-opacity', 0).style('stroke-width', 0).style('pointer-events', 'none').style('mix-blend-mode', 'screen').attr('filter', 'url(#flowGlow)')
       flowSelection.exit().transition().duration(220).style('stroke-opacity', 0).remove()
@@ -469,8 +539,11 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       entered.append('circle').attr('class', 'gring-rim').attr('r', (d) => nr(d) * 1.9).attr('fill', 'none').attr('stroke', (d) => nodeColor(d)).attr('stroke-width', 0.32).attr('stroke-linecap', 'round').attr('stroke-opacity', 0.15).attr('opacity', 0).attr('pointer-events', 'none')
       entered.filter((d) => d.level === 1).append('circle').attr('class', 'gring-mid-halo').attr('r', (d) => nr(d) * 1.14).attr('fill', (d) => nodeColor(d)).attr('fill-opacity', 0.22).attr('stroke', 'none').attr('opacity', 0).attr('pointer-events', 'none').attr('filter', 'url(#pulseHalo6)')
       entered.filter((d) => d.level === 1).append('circle').attr('class', 'gring-mid-rim').attr('r', (d) => nr(d) * 1.35).attr('fill', 'none').attr('stroke', (d) => nodeColor(d)).attr('stroke-width', 0.28).attr('stroke-linecap', 'round').attr('stroke-opacity', 0.16).attr('opacity', 0).attr('pointer-events', 'none')
-      entered.append('circle').attr('class', 'nbody').attr('r', (d) => nr(d)).attr('fill', (d) => `${nodeColor(d)}20`).attr('stroke', (d) => nodeColor(d)).attr('stroke-width', (d) => (d.level === 1 ? 2 : 1.5)).attr('filter', (d) => (d.level === 1 ? 'url(#glow6)' : 'url(#glow3)'))
+      entered.append('circle').attr('class', 'nbody').attr('r', (d) => nr(d)).attr('fill', (d) => (d.level === 3 ? withAlpha(level3ColdColor(d), 0.13) : withAlpha(nodeColor(d), 0.13))).attr('stroke', (d) => (d.level === 3 ? level3ColdColor(d) : nodeColor(d))).attr('stroke-width', (d) => (d.level === 1 ? 2 : d.level === 2 ? 1.5 : 1.1)).attr('filter', (d) => (d.level === 1 ? 'url(#glow6)' : 'url(#glow3)'))
       entered.filter((d) => d.level <= 2).append('circle').attr('class', 'ncore').attr('r', (d) => nr(d) * 0.38).attr('fill', (d) => nodeColor(d)).attr('filter', 'url(#glow3)')
+      entered.filter((d) => d.level === 2).append('circle').attr('class', 'ncompanion-orbit').attr('r', (d) => nr(d) * 0.74).attr('fill', 'none').attr('stroke', (d) => nodeColor(d)).attr('stroke-opacity', 0.22).attr('stroke-width', 0.45).attr('stroke-dasharray', '1.4,2.4').attr('transform', 'rotate(-18)').attr('pointer-events', 'none')
+      entered.filter((d) => d.level === 2).append('circle').attr('class', 'ncompanion').attr('cx', (d) => nr(d) * 0.52).attr('cy', (d) => -nr(d) * 0.24).attr('r', (d) => nr(d) * 0.22).attr('fill', (d) => d3.interpolateRgb(nodeColor(d), '#ffffff')(0.35)).attr('fill-opacity', 0.9).attr('filter', 'url(#glow3)').attr('pointer-events', 'none')
+      entered.filter((d) => d.level === 3).append('circle').attr('class', 'ncold').attr('r', (d) => nr(d) * 0.42).attr('fill', (d) => level3ColdColor(d)).attr('fill-opacity', 0.92).attr('filter', 'url(#glow3)').attr('pointer-events', 'none')
       entered.filter((d) => d.level === 1).each(function (d) {
         const gg = d3.select(this)
         const s = nr(d) * 0.75
@@ -496,11 +569,19 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
         const target = typeof d.target === 'object' ? d.target : nodeMap[d.target]
         return nodeBelongsToRoot(source, activeRootId) && nodeBelongsToRoot(target, activeRootId) ? 1 : 0.1
       }
+      const dimConstellationOpacity = (d: RefLink) => {
+        if (!activeRootId) return 0.76
+        const source = typeof d.source === 'object' ? d.source : nodeMap[d.source]
+        const target = typeof d.target === 'object' ? d.target : nodeMap[d.target]
+        return nodeBelongsToRoot(source, activeRootId) && nodeBelongsToRoot(target, activeRootId) ? 1 : 0.06
+      }
       if (rootDimmingChanged) {
+        activeConstellationSelection.transition().duration(420).style('opacity', (d) => dimConstellationOpacity(d))
         activeNodeSelection.transition().duration(420).style('opacity', (d) => dimNodeOpacity(d))
         activeLabelSelection.transition().duration(420).style('opacity', (d) => dimLabelOpacity(d))
         activeLinkSelection.transition().duration(420).style('opacity', (d) => dimLinkOpacity(d))
       } else {
+        activeConstellationSelection.style('opacity', (d) => dimConstellationOpacity(d))
         activeNodeSelection.style('opacity', (d) => dimNodeOpacity(d))
         activeLabelSelection.style('opacity', (d) => dimLabelOpacity(d))
         activeLinkSelection.style('opacity', (d) => dimLinkOpacity(d))
@@ -582,7 +663,7 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
         focusX = sourceEvent.clientX - rect.left
         focusY = sourceEvent.clientY - rect.top
       }
-      viewportRef.current = { x: event.transform.x, y: event.transform.y, k: event.transform.k, focusX, focusY }
+      viewportRef.current = { ...viewportRef.current, x: event.transform.x, y: event.transform.y, k: event.transform.k, focusX, focusY }
       g.attr('transform', event.transform.toString())
     })
 
