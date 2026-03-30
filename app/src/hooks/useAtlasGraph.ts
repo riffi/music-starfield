@@ -157,6 +157,8 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       return acc
     }, {})
     const rootNodes = nodes.filter((node) => node.level === 1)
+    const rootWeightById = new Map<string, number>()
+    const rootRadiusById = new Map<string, number>()
 
     const defs = svg.append('defs')
     ;['glow3', 'glow6', 'glow10'].forEach((id, index) => {
@@ -183,16 +185,13 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
     const labelG = g.append('g')
     const expanded = new Set<string>()
     let previousGraphActiveRootId: string | null = null
+    let previousGraphActiveLevel2Id: string | null = null
 
     function getL1(node: RefNode) {
       if (node.level === 1) return node
       if (node.level === 2) return node.parent ? nodeMap[node.parent] ?? null : null
       if (node.level === 3) return node.parent ? nodeMap[nodeMap[node.parent]?.parent ?? ''] ?? null : null
       return null
-    }
-    function clampSectorSpan(rootCount: number) {
-      const naturalStep = TAU / Math.max(rootCount, 1)
-      return Math.min(1.78, naturalStep * 0.88)
     }
     function distributeOffset(index: number, total: number) {
       if (total <= 1) return 0
@@ -208,8 +207,14 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       const expandedRoots = rootNodes.filter((root) => expanded.has(root.id))
       return expandedRoots.length === 1 ? expandedRoots[0].id : null
     }
+    function getActiveLevel2Id(activeRootId: string | null) {
+      if (!activeRootId) return null
+      const expandedLevel2 = (childrenByParent[activeRootId] ?? []).filter((node) => node.level === 2 && expanded.has(node.id))
+      return expandedLevel2.length === 1 ? expandedLevel2[0].id : null
+    }
     function nr(node: RefNode) {
-      return node.level === 1 ? 27 : node.level === 2 ? 16 : 9
+      if (node.level === 1) return rootRadiusById.get(node.id) ?? 27
+      return node.level === 2 ? 16 : 9
     }
     function getVisible() {
       const visibleNodes = nodes.filter((node) => {
@@ -233,56 +238,123 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       const level3Children = (childrenByParent[child.id] ?? []).filter((g) => visibleIds.has(g.id))
       const l3Count = level3Children.length
       if (l3Count === 0) return [] as { id: string; x: number; y: number }[]
-      const level3Orbit = 120 + Math.max(0, l3Count - 2) * 22 + Math.max(0, level2SiblingCount - 5) * 5
+      const rootDistance = Math.hypot(childX - rootX, childY - rootY)
+      const level3Orbit = Math.max(96, rootDistance * 0.56) + Math.max(0, l3Count - 2) * 16 + Math.max(0, level2SiblingCount - 5) * 3
       const branchAngle = Math.atan2(childY - rootY, childX - rootX)
       const branchDirX = Math.cos(branchAngle)
       const branchDirY = Math.sin(branchAngle)
-      const branchTanX = Math.cos(branchAngle + Math.PI / 2)
-      const branchTanY = Math.sin(branchAngle + Math.PI / 2)
-      const level3Span = Math.min(Math.PI * 0.95, Math.max(sectorSpan * 0.88, 0.52 + l3Count * 0.24))
-      let level3TangentLimit = Math.tan(level3Span / 2) * level3Orbit * 0.94
+      const centerX = width() / 2
+      const centerY = height() / 2
+      const outwardX = childX - centerX
+      const outwardY = childY - centerY
+      const outwardAngle = Math.atan2(outwardY || branchDirY, outwardX || branchDirX)
+      const outwardDirX = Math.cos(outwardAngle)
+      const outwardDirY = Math.sin(outwardAngle)
+      const outwardTanX = Math.cos(outwardAngle + Math.PI / 2)
+      const outwardTanY = Math.sin(outwardAngle + Math.PI / 2)
+      const level3Span = Math.min(Math.PI * 0.9, Math.max(sectorSpan * 0.76, 0.46 + l3Count * 0.2))
+      let level3TangentLimit = Math.tan(level3Span / 2) * level3Orbit * 0.86
       const l3Radius = 9
-      const minL3Gap = l3Radius * 2 + 38
+      const minL3Gap = l3Radius * 2 + 40
       if (l3Count > 1) level3TangentLimit = Math.max(level3TangentLimit, (minL3Gap * (l3Count - 1)) / 2)
       return level3Children.map((grandchild, grandchildIndex) => {
-        const offset = distributeOffset(grandchildIndex, level3Children.length)
-        const branchSpread = level3TangentLimit * offset
-        return { id: grandchild.id, x: childX + branchDirX * level3Orbit + branchTanX * branchSpread, y: childY + branchDirY * level3Orbit + branchTanY * branchSpread }
+        const offset = l3Count === 1 ? 0 : l3Count === 2 ? grandchildIndex * 0.92 : distributeOffset(grandchildIndex, level3Children.length)
+        const branchSpread = l3Count === 2 ? level3TangentLimit * offset : level3TangentLimit * offset
+        return {
+          id: grandchild.id,
+          x: childX + outwardDirX * level3Orbit + outwardTanX * branchSpread,
+          y: childY + outwardDirY * level3Orbit + outwardTanY * branchSpread,
+        }
       })
     }
-    function computeTargets(visibleNodes: RefNode[]) {
+    function collectSubtree(rootId: string) {
+      const acc: RefNode[] = []
+      const stack = [...(childrenByParent[rootId] ?? [])]
+      while (stack.length > 0) {
+        const next = stack.pop()
+        if (!next) continue
+        acc.push(next)
+        const kids = childrenByParent[next.id]
+        if (kids) stack.push(...kids)
+      }
+      return acc
+    }
+    function computeRootMetrics() {
+      const weights = rootNodes.map((root) => {
+        const subtree = collectSubtree(root.id)
+        const level2Count = subtree.filter((node) => node.level === 2).length
+        const level3Count = subtree.filter((node) => node.level === 3).length
+        const stationFootprint = subtree.reduce((sum, node) => sum + Math.min(node.stations.length, node.level === 2 ? 3 : 2), 0)
+        const rawWeight = 1 + level2Count * 1.2 + level3Count * 1.75 + stationFootprint * 0.28
+        return { id: root.id, weight: Math.sqrt(rawWeight) }
+      })
+      const minWeight = Math.min(...weights.map((entry) => entry.weight))
+      const maxWeight = Math.max(...weights.map((entry) => entry.weight))
+      for (const entry of weights) {
+        rootWeightById.set(entry.id, entry.weight)
+        const normalized = maxWeight > minWeight ? (entry.weight - minWeight) / (maxWeight - minWeight) : 0
+        rootRadiusById.set(entry.id, 24 + normalized * 8)
+      }
+    }
+    function computeRootLayout(activeRootId: string | null) {
+      const focusBoost = activeRootId ? 1.7 : 1
+      const gap = Math.min(0.14, TAU / Math.max(rootNodes.length * 14, 1))
+      const totalGap = gap * rootNodes.length
+      const availableArc = Math.max(TAU - totalGap, TAU * 0.7)
+      let totalWeight = 0
+      const weightedRoots = rootNodes.map((root) => {
+        const weight = (rootWeightById.get(root.id) ?? 1) * (activeRootId && root.id === activeRootId ? focusBoost : 1)
+        totalWeight += weight
+        return { root, weight }
+      })
+      const layout = new Map<string, { angle: number; span: number }>()
+      let cursor = -Math.PI / 2
+      for (const { root, weight } of weightedRoots) {
+        const span = availableArc * (weight / Math.max(totalWeight, 0.001))
+        layout.set(root.id, { angle: cursor + span * 0.5, span })
+        cursor += span + gap
+      }
+      return layout
+    }
+    function computeTargets(visibleNodes: RefNode[], activeRootId: string | null) {
       const targets = new Map<string, { x: number; y: number }>()
       const visibleIds = new Set(visibleNodes.map((node) => node.id))
       const centerX = width() / 2
       const centerY = height() / 2
       const rootOrbit = Math.max(210, Math.min(width(), height()) * 0.34)
-      const expandedRootCount = rootNodes.filter((r) => expanded.has(r.id)).length
-      const sectorSpan = clampSectorSpan(expandedRootCount > 0 ? expandedRootCount : rootNodes.length)
-      rootNodes.forEach((root, rootIndex) => {
-        const rootAngle = -Math.PI / 2 + (rootIndex / Math.max(rootNodes.length, 1)) * TAU
+      const rootLayout = computeRootLayout(activeRootId)
+      rootNodes.forEach((root) => {
+        const rootMeta = rootLayout.get(root.id)
+        if (!rootMeta) return
+        const rootAngle = rootMeta.angle
         const rootX = centerX + Math.cos(rootAngle) * rootOrbit
         const rootY = centerY + Math.sin(rootAngle) * rootOrbit
         targets.set(root.id, { x: rootX, y: rootY })
         const level2Children = (childrenByParent[root.id] ?? []).filter((child) => visibleIds.has(child.id))
-        const baseLevel2Orbit = 172 + Math.max(0, level2Children.length - 4) * 20
+        const rootWeight = rootWeightById.get(root.id) ?? 1
+        const isActiveRoot = activeRootId === root.id
+        const baseLevel2Orbit = 166 + Math.max(0, level2Children.length - 4) * 16 + (rootWeight - 1) * 4 + (isActiveRoot ? 12 : 0)
         const rootDirX = Math.cos(rootAngle)
         const rootDirY = Math.sin(rootAngle)
         const rootTanX = Math.cos(rootAngle + Math.PI / 2)
         const rootTanY = Math.sin(rootAngle + Math.PI / 2)
-        const level2TangentLimit = Math.tan(sectorSpan / 2) * baseLevel2Orbit * 0.96
+        const level2Span = Math.min(Math.PI * 0.86, Math.max(rootMeta.span * (isActiveRoot ? 0.94 : 0.9), isActiveRoot ? 0.82 : 0.56))
+        const level2TangentLimit = Math.tan(level2Span / 2) * baseLevel2Orbit * 0.96
         level2Children.forEach((child, childIndex) => {
           const level2Offset = distributeOffset(childIndex, level2Children.length)
           const tangentSpread = level2TangentLimit * level2Offset
           const childX = rootX + rootDirX * baseLevel2Orbit + rootTanX * tangentSpread
           const childY = rootY + rootDirY * baseLevel2Orbit + rootTanY * tangentSpread
           targets.set(child.id, { x: childX, y: childY })
-          for (const p of placeLevel3Fan(child, childX, childY, rootX, rootY, sectorSpan, level2Children.length, visibleIds)) {
+          for (const p of placeLevel3Fan(child, childX, childY, rootX, rootY, level2Span, level2Children.length, visibleIds)) {
             targets.set(p.id, { x: p.x, y: p.y })
           }
         })
       })
-      return targets
+      return { targets, rootLayout }
     }
+
+    computeRootMetrics()
 
     const simulation = d3.forceSimulation<RefNode>().velocityDecay(0.42)
       .force('link', d3.forceLink<RefNode, RefLink>().id((d) => d.id).distance((d) => {
@@ -346,12 +418,13 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       if (!initial) simulation.stop()
       const { visibleNodes, visibleLinks } = getVisible()
       const visibleIds = new Set(visibleNodes.map((n) => n.id))
-      const targets = computeTargets(visibleNodes)
       const activeRootId = getActiveRootId()
-      const expandedRootCount = rootNodes.filter((r) => expanded.has(r.id)).length
-      const sectorSpanForTween = clampSectorSpan(expandedRootCount > 0 ? expandedRootCount : rootNodes.length)
+      const activeLevel2Id = getActiveLevel2Id(activeRootId)
+      const { targets, rootLayout } = computeTargets(visibleNodes, activeRootId)
+      const focusTargetChanged = initial || activeRootId !== previousGraphActiveRootId || activeLevel2Id !== previousGraphActiveLevel2Id
       const rootDimmingChanged = initial || activeRootId !== previousGraphActiveRootId
       previousGraphActiveRootId = activeRootId
+      previousGraphActiveLevel2Id = activeLevel2Id
 
       simulation.force('center', d3.forceCenter(width() / 2, height() / 2))
       simulation.force('orbit-x', d3.forceX<RefNode>((d) => targets.get(d.id)?.x ?? width() / 2).strength((d) => (d.level === 1 ? 0.3 : d.level === 2 ? 0.76 : 0.68)))
@@ -441,13 +514,16 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
         function applyL3FromCurrentL2() {
           rootNodes.forEach((root) => {
             if (!visibleIds.has(root.id)) return
+            const rootMeta = rootLayout.get(root.id)
+            if (!rootMeta) return
             const rootX = root.x ?? targets.get(root.id)!.x
             const rootY = root.y ?? targets.get(root.id)!.y
             const level2Children = (childrenByParent[root.id] ?? []).filter((c) => visibleIds.has(c.id))
+            const level2Span = Math.min(Math.PI * 0.92, Math.max(rootMeta.span * 0.9, 0.56))
             for (const child of level2Children) {
               const cx = child.x ?? targets.get(child.id)!.x
               const cy = child.y ?? targets.get(child.id)!.y
-              for (const p of placeLevel3Fan(child, cx, cy, rootX, rootY, sectorSpanForTween, level2Children.length, visibleIds)) {
+              for (const p of placeLevel3Fan(child, cx, cy, rootX, rootY, level2Span, level2Children.length, visibleIds)) {
                 const n = nodeMap[p.id]
                 n.x = p.x
                 n.y = p.y
@@ -486,11 +562,15 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       const focusTransform = !activeRootId
         ? d3.zoomIdentity.translate(width() / 2, height() / 2).scale(1).translate(-width() / 2, -height() / 2)
         : (() => {
+            const level2Target = activeLevel2Id ? targets.get(activeLevel2Id) : null
+            if (level2Target) {
+              return d3.zoomIdentity.translate(width() / 2, height() / 2).scale(1.28).translate(-level2Target.x, -level2Target.y)
+            }
             const rootTarget = targets.get(activeRootId)
             if (!rootTarget) return d3.zoomIdentity.translate(width() / 2, height() / 2).scale(1).translate(-width() / 2, -height() / 2)
             return d3.zoomIdentity.translate(width() / 2, height() / 2).scale(1.18).translate(-rootTarget.x, -rootTarget.y)
           })()
-      if (rootDimmingChanged) svg.transition().duration(initial ? 100 : 700).ease(d3.easeCubicOut).call(zoomBehavior.transform, focusTransform)
+      if (focusTargetChanged) svg.transition().duration(initial ? 100 : 700).ease(d3.easeCubicOut).call(zoomBehavior.transform, focusTransform)
     }
 
     const zoomBehavior = d3.zoom<SVGSVGElement, unknown>().scaleExtent([0.2, 3.5]).on('zoom', (event) => {

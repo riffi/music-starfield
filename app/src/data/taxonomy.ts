@@ -14,6 +14,7 @@ export type TaxonomyRoot =
   | 'reggae_ska_dub'
   | 'blues'
   | 'soundtrack_stage'
+  | 'instrumental'
   | 'experimental_noise'
 
 export type TaxonKind = 'genre' | 'style' | 'descriptor' | 'form' | 'instrument' | 'period'
@@ -65,6 +66,7 @@ export const rootColors: Record<TaxonomyRoot, string> = {
   reggae_ska_dub: '#7bbd5d',
   blues: '#4c78c9',
   soundtrack_stage: '#c8a970',
+  instrumental: '#8fb7a3',
   experimental_noise: '#7a68c7',
 }
 
@@ -77,6 +79,7 @@ export const styleTaxonomy: StyleTaxon[] = [
   { id: 'rnbsoulfunk', name: 'R&B, Soul & Funk', root: 'rnb_soul_funk', kind: 'genre', level: 1 },
   { id: 'jazz', name: 'Jazz', root: 'jazz', kind: 'genre', level: 1, isAtlasVisible: true },
   { id: 'classical', name: 'Classical', root: 'classical', kind: 'genre', level: 1, isAtlasVisible: true },
+  { id: 'instrumental', name: 'Instrumental', root: 'instrumental', kind: 'genre', level: 1, isAtlasVisible: true },
   { id: 'metal', name: 'Metal', root: 'metal', kind: 'genre', level: 1 },
   { id: 'punkhardcore', name: 'Punk & Hardcore', root: 'punk_hardcore', kind: 'genre', level: 1 },
   { id: 'folkcountryworld', name: 'Folk, Country & World', root: 'folk_country_world', kind: 'genre', level: 1 },
@@ -123,7 +126,7 @@ export const styleTaxonomy: StyleTaxon[] = [
   { id: 'nujazz', name: 'Nu Jazz', root: 'jazz', kind: 'genre', level: 2, parentId: 'jazz', isAtlasVisible: true },
   { id: 'latinjazz', name: 'Latin Jazz', root: 'jazz', kind: 'genre', level: 2, parentId: 'jazz' },
 
-  { id: 'piano', name: 'Piano', root: 'classical', kind: 'instrument', level: 2, parentId: 'classical', isAtlasVisible: true },
+  { id: 'piano', name: 'Piano', root: 'instrumental', kind: 'instrument', level: 2, parentId: 'instrumental', isAtlasVisible: true },
   { id: 'opera', name: 'Opera', root: 'classical', kind: 'form', level: 2, parentId: 'classical' },
   { id: 'baroque', name: 'Baroque', root: 'classical', kind: 'period', level: 2, parentId: 'classical' },
 
@@ -136,13 +139,13 @@ export const styleTaxonomy: StyleTaxon[] = [
   { id: 'hardcore', name: 'Hardcore', root: 'punk_hardcore', kind: 'genre', level: 2, parentId: 'punkhardcore' },
 
   { id: 'folk', name: 'Folk', root: 'folk_country_world', kind: 'genre', level: 2, parentId: 'folkcountryworld' },
-  { id: 'country', name: 'Country', root: 'folk_country_world', kind: 'genre', level: 2, parentId: 'folkcountryworld' },
+  { id: 'country', name: 'Country', root: 'folk_country_world', kind: 'genre', level: 2, parentId: 'folkcountryworld', isAtlasVisible: true },
   { id: 'world', name: 'World', root: 'folk_country_world', kind: 'genre', level: 2, parentId: 'folkcountryworld' },
 
   { id: 'samba', name: 'Samba', root: 'latin', kind: 'genre', level: 2, parentId: 'latin' },
   { id: 'bossanova', name: 'Bossa Nova', root: 'latin', kind: 'genre', level: 2, parentId: 'latin', isAtlasVisible: true },
 
-  { id: 'reggae', name: 'Reggae', root: 'reggae_ska_dub', kind: 'genre', level: 2, parentId: 'reggaeskadub' },
+  { id: 'reggae', name: 'Reggae', root: 'reggae_ska_dub', kind: 'genre', level: 2, parentId: 'reggaeskadub', isAtlasVisible: true },
   { id: 'dub', name: 'Dub', root: 'reggae_ska_dub', kind: 'genre', level: 2, parentId: 'reggaeskadub' },
   { id: 'ska', name: 'Ska', root: 'reggae_ska_dub', kind: 'genre', level: 2, parentId: 'reggaeskadub' },
 
@@ -222,7 +225,7 @@ export const styleRelations: StyleRelation[] = [
   { id: 'jazz-parent-nujazz', sourceId: 'jazz', targetId: 'nujazz', kind: 'parent_of' },
   { id: 'jazz-parent-latinjazz', sourceId: 'jazz', targetId: 'latinjazz', kind: 'parent_of' },
 
-  { id: 'classical-parent-piano', sourceId: 'classical', targetId: 'piano', kind: 'parent_of' },
+  { id: 'instrumental-parent-piano', sourceId: 'instrumental', targetId: 'piano', kind: 'parent_of' },
   { id: 'classical-parent-opera', sourceId: 'classical', targetId: 'opera', kind: 'parent_of' },
   { id: 'classical-parent-baroque', sourceId: 'classical', targetId: 'baroque', kind: 'parent_of' },
 
@@ -535,6 +538,24 @@ export const stationBindings: StationBinding[] = [
     primaryStyleId: 'lounge',
   },
   {
+    id: 'record-summer-lounge',
+    name: 'Summer Lounge (Радио Рекорд)',
+    streamUrl: 'https://hls-01-radiorecord.hostingradio.ru/record-summerlounge/playlist.m3u8',
+    countryLabel: 'RU',
+    bitrateLabel: 'HLS',
+    primaryStyleId: 'lounge',
+  },
+  {
+    id: 'record-lofi',
+    name: 'Lo-Fi (Радио Рекорд)',
+    streamUrl: 'https://hls-01-radiorecord.hostingradio.ru/record-lofi/playlist.m3u8',
+    countryLabel: 'RU',
+    bitrateLabel: 'HLS',
+    primaryStyleId: 'lofichill',
+    secondaryStyleIds: ['lounge'],
+    descriptorIds: ['chillout'],
+  },
+  {
     id: 'radio-art-vocal-chillout',
     name: 'Radio Art - Vocal Chillout',
     streamUrl: 'https://live.radioart.com/fVocal_chillout.mp3',
@@ -569,6 +590,14 @@ export const stationBindings: StationBinding[] = [
     primaryStyleId: 'classical',
   },
   {
+    id: 'whisperings-solo-piano',
+    name: 'Whisperings: Solo Piano',
+    streamUrl: 'https://pianosolo.streamguys1.com/live',
+    countryLabel: 'US',
+    bitrateLabel: '128k',
+    primaryStyleId: 'piano',
+  },
+  {
     id: 'indie-pop-rocks',
     name: 'SomaFM: Indie Pop Rocks',
     streamUrl: 'https://ice1.somafm.com/indiepop-128-aac',
@@ -585,6 +614,22 @@ export const stationBindings: StationBinding[] = [
     bitrateLabel: '128k',
     primaryStyleId: 'alternativerock',
     secondaryStyleIds: ['rock', 'indierock'],
+  },
+  {
+    id: 'hard-rock-star-fm',
+    name: 'Hard Rock (STAR FM)',
+    streamUrl: 'https://stream.starfm.de/hardrock/mp3-128/webseite',
+    countryLabel: 'DE',
+    bitrateLabel: '128k',
+    primaryStyleId: 'hardrock',
+  },
+  {
+    id: 'hard-rock-heaven',
+    name: 'Hard Rock Heaven',
+    streamUrl: 'http://hydra.cdnstream.com/1521_128',
+    countryLabel: 'US',
+    bitrateLabel: '128k',
+    primaryStyleId: 'hardrock',
   },
   {
     id: 'n5md-radio',
@@ -646,5 +691,45 @@ export const stationBindings: StationBinding[] = [
     bitrateLabel: '128k',
     primaryStyleId: 'bossanova',
     descriptorIds: ['cafejazz'],
+  },
+  {
+    id: 'record-latina',
+    name: 'Latina Dance',
+    streamUrl: 'https://hls-01-radiorecord.hostingradio.ru/record-latina/playlist.m3u8',
+    countryLabel: 'RU',
+    bitrateLabel: 'HLS',
+    primaryStyleId: 'latin',
+  },
+  {
+    id: 'vibration-latina',
+    name: 'Vibration Latina',
+    streamUrl: 'https://vibration.stream2net.eu/vibracion-latina.mp3',
+    countryLabel: 'FR',
+    bitrateLabel: '128k',
+    primaryStyleId: 'latin',
+  },
+  {
+    id: 'country-108',
+    name: 'Country 108',
+    streamUrl: 'http://icepool.silvacast.com/COUNTRY108.mp3',
+    countryLabel: 'DE',
+    bitrateLabel: '128k',
+    primaryStyleId: 'country',
+  },
+  {
+    id: 'rautemusik-country',
+    name: 'Country (Rautemusik FM)',
+    streamUrl: 'https://country-high.rautemusik.fm/',
+    countryLabel: 'DE',
+    bitrateLabel: '192k',
+    primaryStyleId: 'country',
+  },
+  {
+    id: 'gotradio-reggae-rasta-roots',
+    name: 'Reggae Rasta & Roots (GotRadio)',
+    streamUrl: 'https://pureplay.cdnstream1.com/6051_128.mp3',
+    countryLabel: 'JM',
+    bitrateLabel: '128k',
+    primaryStyleId: 'reggae',
   },
 ]
