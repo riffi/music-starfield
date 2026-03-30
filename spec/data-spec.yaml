@@ -1,0 +1,139 @@
+docType: data-spec
+format_version: "0.0.1"
+
+metadata:
+  name: music_galaxy
+  version: "0.1"
+  description_short: "Logical graph model for music styles and public radio stations"
+
+description: |
+  The system models music styles as graph nodes connected by logical relations.
+  Public online radio stations are linked to one or more styles.
+  Users explore the graph visually, inspect a selected style, and play radio streams
+  associated with that style while continuing to navigate the atlas.
+
+enums:
+  style_relation_type:
+    description: "Logical meaning of a relation between two music styles"
+    values:
+      - name: parent_of
+        label: "Parent Of"
+        description: "A broader style contains a narrower style as part of its main taxonomy"
+      - name: related_to
+        label: "Related To"
+        description: "Two styles are strongly related without strict parent-child hierarchy"
+      - name: influenced_by
+        label: "Influenced By"
+        description: "One style is historically or stylistically influenced by another"
+      - name: adjacent_to
+        label: "Adjacent To"
+        description: "Two styles are near each other in discovery and listening space"
+
+entities:
+  style:
+    label: "Style"
+    description: "A music genre, subgenre, or microgenre represented as a graph node"
+    fields:
+      id:
+        type: uuid
+        pk: true
+      slug:
+        type: string
+        required: true
+        unique: true
+      name:
+        type: string
+        required: true
+      description:
+        type: string
+      is_root:
+        type: boolean
+        default: false
+      visual_group:
+        type: string
+      exploration_level:
+        type: integer
+
+  style_relation:
+    label: "Style Relation"
+    description: "Logical edge between two styles in the graph"
+    fields:
+      id:
+        type: uuid
+        pk: true
+      source_style_id:
+        type: uuid
+        required: true
+        fk: style.id
+      target_style_id:
+        type: uuid
+        required: true
+        fk: style.id
+      relation_type:
+        type: style_relation_type
+        required: true
+      weight:
+        type: decimal
+
+  radio_station:
+    label: "Radio Station"
+    description: "Public online radio stream available for listening"
+    fields:
+      id:
+        type: uuid
+        pk: true
+      name:
+        type: string
+        required: true
+      stream_url:
+        type: string
+        required: true
+      homepage_url:
+        type: string
+      country_label:
+        type: string
+      bitrate_label:
+        type: string
+      is_public:
+        type: boolean
+        default: true
+      is_active:
+        type: boolean
+        default: true
+
+  station_style:
+    label: "Station Style Mapping"
+    description: "Mapping between a radio station and a music style"
+    fields:
+      id:
+        type: uuid
+        pk: true
+      station_id:
+        type: uuid
+        required: true
+        fk: radio_station.id
+      style_id:
+        type: uuid
+        required: true
+        fk: style.id
+      relevance_score:
+        type: decimal
+
+relations:
+  - entity_a: style
+    entity_b: style_relation
+    cardinality: one_to_many
+    label: "connects through"
+    description: "A style can participate in many graph relations with other styles"
+
+  - entity_a: radio_station
+    entity_b: station_style
+    cardinality: one_to_many
+    label: "is mapped through"
+    description: "A radio station can be mapped to multiple music styles"
+
+  - entity_a: style
+    entity_b: station_style
+    cardinality: one_to_many
+    label: "has mapped stations"
+    description: "A style can have multiple radio stations associated with it"

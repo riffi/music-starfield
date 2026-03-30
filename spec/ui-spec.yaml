@@ -1,0 +1,83 @@
+docType: ui-spec
+format_version: "0.0.3"
+
+metadata:
+  name: music-galaxy
+  description: "Interactive atlas of music styles represented as a navigable graph. Users explore root genres and subgenres, open a selected style, and listen to public online radio stations associated with that style."
+  theme: "celestial atlas interface with premium dark mood and glowing constellation accents"
+  background: "deep space backdrop with subtle stars and atmospheric gradients"
+  palette:
+    primary: "aged gold highlights for active UI elements"
+    surface: "near-black translucent panels with soft blur"
+    relax: "warm amber cluster color"
+    electronic: "cool blue cluster color"
+    rock: "muted crimson cluster color"
+    jazz: "violet cluster color"
+
+screens:
+  atlas_explorer:
+    title: "Atlas Explorer"
+    purpose: "Main workspace for exploring the music-style graph, selecting a style node, opening its related radio stations, and controlling playback without leaving the map."
+    blocks:
+      - id: top_header
+        columns: 12
+        purpose: "Top overlay header with application title, short atmospheric subtitle, and color legend for root style families."
+
+      - id: graph_canvas
+        columns: 12
+        purpose: "Central interactive graph canvas showing root styles, substyles, and visible relationships between them. Supports pan, zoom, hover inspection, node expansion, node collapse, and node selection."
+
+      - id: hover_tooltip
+        columns: 12
+        purpose: "Floating tooltip near the pointer with hovered node name, style level, related station count, and the next available interaction hint."
+
+      - id: style_detail_drawer
+        columns: 12
+        purpose: "Right-side drawer opened for the currently selected style. Shows style name, style level label, optional note about child styles, and a list of playable public radio stations mapped to this style."
+        blocks:
+          - id: drawer_header
+            columns: 12
+            purpose: "Top section with style level label, selected style name, and close action for the drawer."
+
+          - id: style_context_note
+            columns: 12
+            purpose: "Optional informational note explaining whether the selected style has child styles or belongs to a broader cluster."
+
+          - id: station_list
+            columns: 12
+            purpose: "Scrollable list of radio station cards for the selected style."
+            blocks:
+              - id: station_card
+                columns: 12
+                purpose: "Radio station card showing station name, country label, bitrate label, current play state, and play or pause action."
+
+      - id: persistent_player
+        columns: 12
+        purpose: "Bottom mini-player that remains visible while browsing the graph. Shows current station name, current style context, playback state, pause and stop controls, and volume adjustment."
+        blocks:
+          - id: playback_context
+            columns: 6
+            purpose: "Current listening context with active style label and active station name."
+
+          - id: playback_activity
+            columns: 2
+            purpose: "Compact visual playback indicator showing whether audio is currently active."
+
+          - id: playback_controls
+            columns: 2
+            purpose: "Pause or resume action and stop action for the active radio stream."
+
+          - id: volume_control
+            columns: 2
+            purpose: "Volume slider for the active radio stream."
+
+      - id: usage_hints
+        columns: 12
+        purpose: "Small helper overlay for first-time users explaining graph navigation, style expansion, station selection, and map movement."
+
+detailing_philosophy:
+  core_principle: "User intent always takes priority over level guidelines"
+
+  level_guidance:
+    exploration:
+      intent: "Discover the main screen and interaction model for graph-based music exploration"
