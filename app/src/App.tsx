@@ -37,6 +37,8 @@ const COLORS = {
   classical: '#7fd1c8',
 } as const
 
+const TAU = Math.PI * 2
+
 const levelLabels = {
   1: 'Major Constellation',
   2: 'Star System',
@@ -429,6 +431,13 @@ function App() {
 
     const width = () => svgEl.clientWidth
     const height = () => svgEl.clientHeight
+    const childrenByParent = nodes.reduce<Record<string, RefNode[]>>((acc, node) => {
+      if (!node.parent) return acc
+      acc[node.parent] ??= []
+      acc[node.parent].push(node)
+      return acc
+    }, {})
+    const rootNodes = nodes.filter((node) => node.level === 1)
 
     const defs = svg.append('defs')
     ;['glow3', 'glow6', 'glow10'].forEach((id, index) => {
@@ -488,6 +497,48 @@ function App() {
       return { visibleNodes, visibleLinks }
     }
 
+    function computeTargets(visibleNodes: RefNode[]) {
+      const targets = new Map<string, { x: number; y: number }>()
+      const visibleIds = new Set(visibleNodes.map((node) => node.id))
+      const centerX = width() / 2
+      const centerY = height() / 2
+      const rootOrbit = Math.max(160, Math.min(width(), height()) * 0.3)
+
+      rootNodes.forEach((root, rootIndex) => {
+        const rootAngle = -Math.PI / 2 + (rootIndex / Math.max(rootNodes.length, 1)) * TAU
+        const rootX = centerX + Math.cos(rootAngle) * rootOrbit
+        const rootY = centerY + Math.sin(rootAngle) * rootOrbit
+        targets.set(root.id, { x: rootX, y: rootY })
+
+        const level2Children = (childrenByParent[root.id] ?? []).filter((child) => visibleIds.has(child.id))
+        const visibleGrandchildren = level2Children.reduce((sum, child) => sum + ((childrenByParent[child.id] ?? []).filter((grandchild) => visibleIds.has(grandchild.id)).length), 0)
+        const level2Orbit = 132 + Math.max(0, level2Children.length - 5) * 16 + visibleGrandchildren * 6
+
+        level2Children.forEach((child, childIndex) => {
+          const childAngle = -Math.PI / 2 + (childIndex / Math.max(level2Children.length, 1)) * TAU
+          const childX = rootX + Math.cos(childAngle) * level2Orbit
+          const childY = rootY + Math.sin(childAngle) * level2Orbit
+          targets.set(child.id, { x: childX, y: childY })
+
+          const level3Children = (childrenByParent[child.id] ?? []).filter((grandchild) => visibleIds.has(grandchild.id))
+          const level3Orbit = 94 + Math.max(0, level3Children.length - 2) * 18 + Math.max(0, level2Children.length - 6) * 6
+          const branchAngle = Math.atan2(childY - rootY, childX - rootX)
+          const arc = level3Children.length <= 1 ? 0 : Math.min(1.7, 0.45 + level3Children.length * 0.26)
+
+          level3Children.forEach((grandchild, grandchildIndex) => {
+            const offset = level3Children.length <= 1 ? 0 : (grandchildIndex / (level3Children.length - 1) - 0.5) * arc
+            const grandchildAngle = branchAngle + offset
+            targets.set(grandchild.id, {
+              x: childX + Math.cos(grandchildAngle) * level3Orbit,
+              y: childY + Math.sin(grandchildAngle) * level3Orbit,
+            })
+          })
+        })
+      })
+
+      return targets
+    }
+
     const simulation = d3
       .forceSimulation<RefNode>()
       .force(
@@ -497,12 +548,24 @@ function App() {
           .id((d) => d.id)
           .distance((d) => {
             const source = typeof d.source === 'object' ? d.source : nodeMap[d.source]
-            return source?.level === 1 ? 130 : source?.level === 2 ? 85 : 60
+            if (!source) return 90
+            if (source.level === 1) {
+              const branchCount = childrenByParent[source.id]?.length ?? 0
+              return 132 + Math.max(0, branchCount - 5) * 16
+            }
+            if (source.level === 2) {
+              const leafCount = childrenByParent[source.id]?.length ?? 0
+              return 98 + Math.max(0, leafCount - 2) * 18
+            }
+            return 60
           })
-          .strength(0.7),
+          .strength((d) => {
+            const source = typeof d.source === 'object' ? d.source : nodeMap[d.source]
+            return source?.level === 2 ? 0.95 : 0.72
+          }),
       )
-      .force('charge', d3.forceManyBody<RefNode>().strength((d) => (d.level === 1 ? -350 : d.level === 2 ? -160 : -80)))
-      .force('collision', d3.forceCollide<RefNode>().radius((d) => nr(d) + 22))
+      .force('charge', d3.forceManyBody<RefNode>().strength((d) => (d.level === 1 ? -420 : d.level === 2 ? -220 : -140)))
+      .force('collision', d3.forceCollide<RefNode>().radius((d) => nr(d) + (d.level === 1 ? 34 : d.level === 2 ? 30 : 26)))
       .force('center', d3.forceCenter())
 
     simulation.on('tick', () => {
@@ -560,13 +623,27 @@ function App() {
 
     function update(initial: boolean) {
       const { visibleNodes, visibleLinks } = getVisible()
+      const targets = computeTargets(visibleNodes)
       simulation.force('center', d3.forceCenter(width() / 2, height() / 2))
+      simulation.force(
+        'orbit-x',
+        d3
+          .forceX<RefNode>((d) => targets.get(d.id)?.x ?? width() / 2)
+          .strength((d) => (d.level === 1 ? 0.22 : d.level === 2 ? 0.2 : 0.34)),
+      )
+      simulation.force(
+        'orbit-y',
+        d3
+          .forceY<RefNode>((d) => targets.get(d.id)?.y ?? height() / 2)
+          .strength((d) => (d.level === 1 ? 0.22 : d.level === 2 ? 0.2 : 0.34)),
+      )
 
       visibleNodes.forEach((node) => {
-        if (node.x === undefined || node.y === undefined) {
-          const parent = node.parent ? nodeMap[node.parent] : null
-          node.x = parent?.x !== undefined ? parent.x + (Math.random() - 0.5) * 50 : width() / 2 + (Math.random() - 0.5) * 180
-          node.y = parent?.y !== undefined ? parent.y + (Math.random() - 0.5) * 50 : height() / 2 + (Math.random() - 0.5) * 180
+        const target = targets.get(node.id)
+        if (!target) return
+        if (node.x === undefined || node.y === undefined || initial) {
+          node.x = target.x + (Math.random() - 0.5) * 28
+          node.y = target.y + (Math.random() - 0.5) * 28
         }
       })
 
