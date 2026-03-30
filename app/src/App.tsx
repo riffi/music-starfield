@@ -34,6 +34,7 @@ const COLORS = {
   electronic: '#5a90d4',
   rock: '#c94848',
   jazz: '#9c5ad4',
+  classical: '#7fd1c8',
 } as const
 
 const levelLabels = {
@@ -838,6 +839,7 @@ function App() {
           <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--electronic)', boxShadow: '0 0 6px var(--electronic)' }} /><span style={{ color: 'var(--text-dim)' }}>Electronic</span></div>
           <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--rock)', boxShadow: '0 0 6px var(--rock)' }} /><span style={{ color: 'var(--text-dim)' }}>Rock</span></div>
           <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--jazz)', boxShadow: '0 0 6px var(--jazz)' }} /><span style={{ color: 'var(--text-dim)' }}>Jazz</span></div>
+          <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--classical)', boxShadow: '0 0 6px var(--classical)' }} /><span style={{ color: 'var(--text-dim)' }}>Classical</span></div>
         </div>
       </div>
 

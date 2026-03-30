@@ -1,4 +1,4 @@
-export type TaxonomyRoot = 'ambient' | 'electronic' | 'rock' | 'jazz'
+export type TaxonomyRoot = 'ambient' | 'electronic' | 'rock' | 'jazz' | 'classical'
 
 export type RelationKind = 'parent_of' | 'related_to' | 'influenced_by' | 'fusion_of'
 
@@ -31,6 +31,7 @@ export const rootColors: Record<TaxonomyRoot, string> = {
   electronic: '#5a90d4',
   rock: '#c94848',
   jazz: '#9c5ad4',
+  classical: '#7fd1c8',
 }
 
 export const styleTaxonomy: StyleTaxon[] = [
@@ -38,6 +39,7 @@ export const styleTaxonomy: StyleTaxon[] = [
   { id: 'electronic', name: 'Electronic', root: 'electronic', level: 1 },
   { id: 'rock', name: 'Rock', root: 'rock', level: 1 },
   { id: 'jazz', name: 'Jazz', root: 'jazz', level: 1 },
+  { id: 'classical', name: 'Classical', root: 'classical', level: 1 },
 
   { id: 'newage', name: 'New Age', root: 'ambient', level: 2, parentId: 'ambient' },
   { id: 'darkambient', name: 'Dark Ambient', root: 'ambient', level: 2, parentId: 'ambient' },
@@ -45,6 +47,7 @@ export const styleTaxonomy: StyleTaxon[] = [
 
   { id: 'house', name: 'House', root: 'electronic', level: 2, parentId: 'electronic' },
   { id: 'techno', name: 'Techno', root: 'electronic', level: 2, parentId: 'electronic' },
+  { id: 'trance', name: 'Trance', root: 'electronic', level: 2, parentId: 'electronic' },
   { id: 'drumandbass', name: 'Drum & Bass', root: 'electronic', level: 2, parentId: 'electronic' },
   { id: 'triphop', name: 'Trip-Hop', root: 'electronic', level: 2, parentId: 'electronic' },
   { id: 'chillout', name: 'Chillout', root: 'electronic', level: 2, parentId: 'electronic' },
@@ -58,6 +61,8 @@ export const styleTaxonomy: StyleTaxon[] = [
   { id: 'smoothjazz', name: 'Smooth Jazz', root: 'jazz', level: 2, parentId: 'jazz' },
   { id: 'nujazz', name: 'Nu Jazz', root: 'jazz', level: 2, parentId: 'jazz' },
   { id: 'bossanova', name: 'Bossa Nova', root: 'jazz', level: 2, parentId: 'jazz' },
+  { id: 'piano', name: 'Piano', root: 'classical', level: 2, parentId: 'classical' },
+  { id: 'baroqueopera', name: 'Baroque & Opera', root: 'classical', level: 2, parentId: 'classical' },
 
   { id: 'deephouse', name: 'Deep House', root: 'electronic', level: 3, parentId: 'house' },
   { id: 'proghouse', name: 'Progressive House', root: 'electronic', level: 3, parentId: 'house' },
@@ -86,6 +91,7 @@ export const styleRelations: StyleRelation[] = [
 
   { id: 'electronic-parent-house', sourceId: 'electronic', targetId: 'house', kind: 'parent_of' },
   { id: 'electronic-parent-techno', sourceId: 'electronic', targetId: 'techno', kind: 'parent_of' },
+  { id: 'electronic-parent-trance', sourceId: 'electronic', targetId: 'trance', kind: 'parent_of' },
   { id: 'electronic-parent-drumandbass', sourceId: 'electronic', targetId: 'drumandbass', kind: 'parent_of' },
   { id: 'electronic-parent-triphop', sourceId: 'electronic', targetId: 'triphop', kind: 'parent_of' },
   { id: 'electronic-parent-chillout', sourceId: 'electronic', targetId: 'chillout', kind: 'parent_of' },
@@ -99,6 +105,8 @@ export const styleRelations: StyleRelation[] = [
   { id: 'jazz-parent-smoothjazz', sourceId: 'jazz', targetId: 'smoothjazz', kind: 'parent_of' },
   { id: 'jazz-parent-nujazz', sourceId: 'jazz', targetId: 'nujazz', kind: 'parent_of' },
   { id: 'jazz-parent-bossanova', sourceId: 'jazz', targetId: 'bossanova', kind: 'parent_of' },
+  { id: 'classical-parent-piano', sourceId: 'classical', targetId: 'piano', kind: 'parent_of' },
+  { id: 'classical-parent-baroqueopera', sourceId: 'classical', targetId: 'baroqueopera', kind: 'parent_of' },
 
   { id: 'house-parent-deephouse', sourceId: 'house', targetId: 'deephouse', kind: 'parent_of' },
   { id: 'house-parent-proghouse', sourceId: 'house', targetId: 'proghouse', kind: 'parent_of' },
@@ -210,6 +218,14 @@ export const stationBindings: StationBinding[] = [
     styleIds: ['electronic', 'chillout', 'downtempo'],
   },
   {
+    id: 'record-chillout',
+    name: 'Рекорд Чилаут',
+    streamUrl: 'https://radiorecord.hostingradio.ru/chil96.aacp',
+    countryLabel: 'RU',
+    bitrateLabel: '96k',
+    styleIds: ['chillout'],
+  },
+  {
     id: 'ural-sound',
     name: 'Ural Sound',
     streamUrl: 'https://5.restream.one/1392_1',
@@ -242,6 +258,22 @@ export const stationBindings: StationBinding[] = [
     styleIds: ['techno', 'minimaltech', 'industrialtech'],
   },
   {
+    id: 'puls-radio-trance',
+    name: 'Trance (Puls Radio)',
+    streamUrl: 'https://icecast.pulsradio.com/pulstranceHD.mp3',
+    countryLabel: 'FR',
+    bitrateLabel: '192k',
+    styleIds: ['trance'],
+  },
+  {
+    id: 'anima-amoris-trance',
+    name: 'Trance (Anima Amoris)',
+    streamUrl: 'https://amoris.sknt.ru/trance',
+    countryLabel: 'RU',
+    bitrateLabel: '160k',
+    styleIds: ['trance'],
+  },
+  {
     id: 'bassdrive',
     name: 'Bassdrive',
     streamUrl: 'http://ice.bassdrive.net:80/stream',
@@ -272,6 +304,22 @@ export const stationBindings: StationBinding[] = [
     countryLabel: 'US',
     bitrateLabel: '128k',
     styleIds: ['vocalchillout'],
+  },
+  {
+    id: 'symphony-fm',
+    name: 'Симфония FM',
+    streamUrl: 'https://radiorecord.hostingradio.ru/symph96.aacp',
+    countryLabel: 'RU',
+    bitrateLabel: '96k',
+    styleIds: ['classical'],
+  },
+  {
+    id: 'orfey',
+    name: 'Орфей',
+    streamUrl: 'https://orfeyfm.hostingradio.ru:8034/orfeyfm128.mp3',
+    countryLabel: 'RU',
+    bitrateLabel: '128k',
+    styleIds: ['classical'],
   },
   {
     id: 'indie-pop-rocks',
