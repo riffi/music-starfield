@@ -100,20 +100,22 @@ function App() {
         onPlayStation={(station) => void player.playStation(station)}
       />
       <HoverTooltip hovered={hovered} />
-      <PlayerBar
-        orreryRef={orreryRef}
-        currentGenre={player.currentGenre}
-        currentName={player.currentName}
-        currentTrackTitle={player.currentTrackTitle}
-        spectrumLevels={player.spectrumLevels}
-        waveformState={player.waveformState}
-        playing={player.playing}
-        loading={!!player.loadingStationId}
-        volume={player.volume}
-        onToggleAudio={player.toggleAudio}
-        onStopAudio={player.stopAudio}
-        onVolumeChange={player.setVolume}
-      />
+      {player.currentStationId ? (
+        <PlayerBar
+          orreryRef={orreryRef}
+          currentGenre={player.currentGenre}
+          currentName={player.currentName}
+          currentTrackTitle={player.currentTrackTitle}
+          spectrumLevels={player.spectrumLevels}
+          waveformState={player.waveformState}
+          playing={player.playing}
+          loading={!!player.loadingStationId}
+          volume={player.volume}
+          onToggleAudio={player.toggleAudio}
+          onStopAudio={player.stopAudio}
+          onVolumeChange={player.setVolume}
+        />
+      ) : null}
       <StaticOverlays />
     </>
   )

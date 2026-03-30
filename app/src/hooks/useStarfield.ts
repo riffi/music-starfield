@@ -39,18 +39,30 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
       height = canvasEl.height = window.innerHeight
     }
 
-    function respawnStarAtEdge(star: Pick<Star, 'x' | 'y'>, ux: number, uy: number) {
+    function placeStar(star: Pick<Star, 'x' | 'y'>, radialBias = Math.random()) {
       const cx = width * 0.5
       const cy = height * 0.5
-      const halfW = width * 0.5 + 48
-      const halfH = height * 0.5 + 48
-      const edgeScale = Math.min(halfW / Math.max(Math.abs(ux), 0.001), halfH / Math.max(Math.abs(uy), 0.001))
-      const tangentX = -uy
-      const tangentY = ux
-      const tangentJitter = (Math.random() - 0.5) * 26
+      const angle = Math.random() * Math.PI * 2
+      const maxRadius = Math.hypot(width, height) * 0.68
+      const minRadius = Math.min(width, height) * 0.08
+      const radius = minRadius + radialBias * (maxRadius - minRadius)
 
-      star.x = cx - ux * edgeScale + tangentX * tangentJitter
-      star.y = cy - uy * edgeScale + tangentY * tangentJitter
+      star.x = cx + Math.cos(angle) * radius
+      star.y = cy + Math.sin(angle) * radius
+    }
+
+    function respawnStarNearCore(star: Pick<Star, 'x' | 'y'>) {
+      const cx = width * 0.5
+      const cy = height * 0.5
+      const angle = Math.random() * Math.PI * 2
+      const minSide = Math.min(width, height)
+      const spawnInner = minSide * 0.06
+      const spawnOuter = minSide * 0.38
+      const spawnBias = Math.random() ** 0.8
+      const spawnRadius = spawnInner + spawnBias * (spawnOuter - spawnInner)
+
+      star.x = cx + Math.cos(angle) * spawnRadius
+      star.y = cy + Math.sin(angle) * spawnRadius
     }
 
     function init() {
@@ -89,9 +101,9 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
       for (let i = 0; i < 520; i += 1) {
         const depth = Math.random() * 1.2 + 0.35
         const radius = Math.random() > 0.92 ? Math.random() * 1.8 + 1.2 : Math.random() * 1.1 + 0.12
-        stars.push({
-          x: Math.random() * width,
-          y: Math.random() * height,
+        const star: Star = {
+          x: 0,
+          y: 0,
           r: radius,
           op: Math.random() * 0.65 + 0.12,
           spd: Math.random() * 0.008 + 0.002,
@@ -99,7 +111,9 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
           col: Math.random() > 0.9 ? '255,224,170' : Math.random() > 0.62 ? '170,185,255' : '235,238,255',
           depth,
           glow: radius > 1.1 ? Math.random() * 12 + 10 : 0,
-        })
+        }
+        placeStar(star, Math.random() ** 0.55)
+        stars.push(star)
       }
     }
 
@@ -182,12 +196,12 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
         const dist = Math.hypot(dx, dy) || 1
         const ux = dx / dist
         const uy = dy / dist
-        const flightSpeed = 0.035 + star.depth * 0.055
+        const flightSpeed = 0.03 + star.depth * 0.05 + audioEnergy * 0.012 + audioBass * 0.008
         star.x += ux * flightSpeed
         star.y += uy * flightSpeed
 
         if (star.x < -80 || star.x > width + 80 || star.y < -80 || star.y > height + 80) {
-          respawnStarAtEdge(star, ux, uy)
+          respawnStarNearCore(star)
         }
 
         const tw = Math.sin(t * star.spd * 55 + star.ph) * 0.5 + 0.5
