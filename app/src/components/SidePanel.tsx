@@ -28,7 +28,12 @@ export function SidePanel({
   return (
     <div id="panel" className={open ? 'open' : ''}>
       <div id="panel-hdr">
-        <div id="p-level">{selectedNode ? levelLabels[selectedNode.level] : 'Constellation'}</div>
+        <div className="panel-scanline" aria-hidden="true" />
+        <div className="panel-corners" aria-hidden="true" />
+        <div className="panel-hdr-meta">
+          <span id="p-level">{selectedNode ? levelLabels[selectedNode.level] : 'Constellation'}</span>
+          <span className="panel-hdr-code">Sector / {selectedNode?.id ?? 'awaiting-lock'}</span>
+        </div>
         <div id="p-name">{selectedNode?.name ?? 'Genre'}</div>
         <button id="p-close" title="Close" onClick={onClose}>✕</button>
       </div>
@@ -36,11 +41,11 @@ export function SidePanel({
         {!selectedNode ? null : panelStations.length ? (
           <>
             {childCount ? (
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic', marginBottom: 14, padding: '8px 10px', border: '1px solid var(--line-soft)', background: 'rgba(255,255,255,.018)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.02)', borderRadius: 4, lineHeight: 1.5 }}>
+              <div className="panel-note">
                 <span style={{ color: 'var(--gold)' }}>✦</span> Contains {childCount} sub-genre{childCount !== 1 ? 's' : ''}. Click the star to expand.
               </div>
             ) : null}
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 9, color: 'var(--text-dim)', letterSpacing: '.2em', textTransform: 'uppercase', marginBottom: 12, textAlign: 'center' }}>
+            <div className="panel-section-label">
               Radio Transmissions
             </div>
             {panelStations.map((station) => {
@@ -49,7 +54,14 @@ export function SidePanel({
               const styleLabels = getStationStyleLabels(station)
               return (
                 <div key={station.id} className={`s-card${active ? ' playing' : ''}`}>
-                  <div className="s-name">{station.name}</div>
+                  <div className="s-card-chrome" aria-hidden="true" />
+                  <div className="s-card-grid" aria-hidden="true" />
+                  <div className="s-head">
+                    <div className="s-name">{station.name}</div>
+                    <button className={`pbtn${active ? ' on' : ''}${loading ? ' loading' : ''}`} onClick={() => onPlayStation(station)}>
+                      {loading ? <span className="btn-spinner" /> : active && playing ? '⏸' : '▶'}
+                    </button>
+                  </div>
                   <div className="s-taxonomy">
                     <span className="s-taxonomy-row">Primary: {styleLabels.primary}</span>
                     {styleLabels.related.length ? <span className="s-taxonomy-row">Related: {styleLabels.related.join(' • ')}</span> : null}
@@ -59,9 +71,6 @@ export function SidePanel({
                     <span className="s-country">{station.countryLabel === 'US' ? '🇺🇸 US' : station.countryLabel}</span>
                     <span className="s-br">{station.bitrateLabel}</span>
                   </div>
-                  <button className={`pbtn${active ? ' on' : ''}${loading ? ' loading' : ''}`} onClick={() => onPlayStation(station)}>
-                    {loading ? <span className="btn-spinner" /> : active && playing ? '⏸' : '▶'}
-                  </button>
                 </div>
               )
             })}

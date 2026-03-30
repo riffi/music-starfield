@@ -17,10 +17,10 @@ export function StaticOverlays() {
         <polygon points="56,30 32,27 28,30 32,33" fill="rgba(212,168,83,0.3)" />
         <circle cx="30" cy="30" r="3" fill="rgba(212,168,83,0.8)" />
         <circle cx="30" cy="30" r="1.5" fill="rgba(212,168,83,1)" />
-        <text x="30" y="19" textAnchor="middle" fontSize="6" fill="rgba(212,168,83,0.9)" fontFamily="Cinzel,serif">N</text>
-        <text x="30" y="52" textAnchor="middle" fontSize="6" fill="rgba(212,168,83,0.6)" fontFamily="Cinzel,serif">S</text>
-        <text x="7" y="33" textAnchor="middle" fontSize="6" fill="rgba(212,168,83,0.6)" fontFamily="Cinzel,serif">W</text>
-        <text x="53" y="33" textAnchor="middle" fontSize="6" fill="rgba(212,168,83,0.6)" fontFamily="Cinzel,serif">E</text>
+        <text x="30" y="19" textAnchor="middle" fontSize="6" fill="rgba(212,168,83,0.9)" fontFamily="Orbitron, sans-serif">N</text>
+        <text x="30" y="52" textAnchor="middle" fontSize="6" fill="rgba(212,168,83,0.6)" fontFamily="Orbitron, sans-serif">S</text>
+        <text x="7" y="33" textAnchor="middle" fontSize="6" fill="rgba(212,168,83,0.6)" fontFamily="Orbitron, sans-serif">W</text>
+        <text x="53" y="33" textAnchor="middle" fontSize="6" fill="rgba(212,168,83,0.6)" fontFamily="Orbitron, sans-serif">E</text>
       </svg>
     </>
   )

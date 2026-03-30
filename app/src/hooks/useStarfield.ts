@@ -2,21 +2,6 @@ import { useEffect, type MutableRefObject, type RefObject } from 'react'
 import { fillAnalyserFrequency } from '../app/audio'
 import type { AudioLevels, ViewportState } from '../app/types'
 
-type StarLayer = 0 | 1 | 2
-
-type BackgroundStar = {
-  x: number
-  y: number
-  r: number
-  op: number
-  ph: number
-  col: string
-  layer: StarLayer
-  glow: number
-  driftX: number
-  driftY: number
-}
-
 type Nebula = {
   x: number
   y: number
@@ -26,7 +11,6 @@ type Nebula = {
   drift: number
 }
 
-type MilkyWayStar = { x: number; y: number; r: number; op: number; ph: number }
 type FlightStar = { x: number; y: number; r: number; op: number; ph: number; col: string; depth: number; glow: number }
 type ShootingStar = { x: number; y: number; vx: number; vy: number; spd: number; len: number; alpha: number; col: string }
 
@@ -60,10 +44,8 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
     let width = 0
     let height = 0
     let frameId: number | null = null
-    let stars: BackgroundStar[] = []
     let flightStars: FlightStar[] = []
     let nebulae: Nebula[] = []
-    let milkyWayStars: MilkyWayStar[] = []
     let shootingStars: ShootingStar[] = []
     let nextShootAt = 0
     let t = 0
@@ -75,39 +57,10 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
     }
 
     function init() {
-      stars = []
       flightStars = []
       nebulae = []
-      milkyWayStars = []
       shootingStars = []
       nextShootAt = 4
-
-      const layerCounts: Record<StarLayer, number> = { 0: 140, 1: 210, 2: 280 }
-      const layerOpacity: Record<StarLayer, [number, number]> = {
-        0: [0.2, 0.5],
-        1: [0.16, 0.42],
-        2: [0.12, 0.32],
-      }
-
-      for (const layer of [0, 1, 2] as const) {
-        for (let i = 0; i < layerCounts[layer]; i += 1) {
-          const bright = Math.random() > (layer === 0 ? 0.82 : layer === 1 ? 0.92 : 0.97)
-          const [minOp, maxOp] = layerOpacity[layer]
-          const star: BackgroundStar = {
-            x: (Math.random() - 0.1) * width * 1.2,
-            y: (Math.random() - 0.1) * height * 1.2,
-            r: bright ? Math.random() * 1.8 + (layer === 0 ? 1.2 : 0.8) : Math.random() * (layer === 0 ? 1.2 : 0.85) + 0.08,
-            op: minOp + Math.random() * (maxOp - minOp),
-            ph: Math.random() * Math.PI * 2,
-            col: bright ? (Math.random() > 0.55 ? '255,226,180' : '196,216,255') : Math.random() > 0.64 ? '182,201,255' : '234,238,255',
-            layer,
-            glow: bright ? Math.random() * (layer === 0 ? 18 : 10) + (layer === 0 ? 12 : 6) : 0,
-            driftX: (Math.random() - 0.5) * (layer === 0 ? 0.016 : layer === 1 ? 0.01 : 0.005),
-            driftY: (Math.random() - 0.5) * (layer === 0 ? 0.012 : layer === 1 ? 0.008 : 0.004),
-          }
-          stars.push(star)
-        }
-      }
 
       for (let i = 0; i < 5; i += 1) {
         nebulae.push({
@@ -120,10 +73,11 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
         })
       }
 
-      for (let i = 0; i < 180; i += 1) {
+      for (let i = 0; i < 360; i += 1) {
         const depth = Math.random() * 1.2 + 0.35
         const angle = Math.random() * Math.PI * 2
-        const spawnRadius = Math.min(width, height) * (0.05 + Math.random() * 0.18)
+        const maxSpawnRadius = Math.sqrt(width * width + height * height) * (0.38 + depth * 0.16)
+        const spawnRadius = Math.min(width, height) * 0.04 + Math.pow(Math.random(), 0.58) * maxSpawnRadius
         flightStars.push({
           x: width * 0.5 + Math.cos(angle) * spawnRadius,
           y: height * 0.5 + Math.sin(angle) * spawnRadius,
@@ -133,21 +87,6 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
           col: Math.random() > 0.88 ? '255,224,170' : Math.random() > 0.58 ? '170,185,255' : '235,238,255',
           depth,
           glow: Math.random() > 0.9 ? Math.random() * 12 + 10 : 0,
-        })
-      }
-
-      const mwAngle = -0.35
-      const mwCx = width * 0.5
-      const mwCy = height * 0.45
-      for (let i = 0; i < 360; i += 1) {
-        const along = (Math.random() - 0.5) * Math.sqrt(width * width + height * height) * 0.98
-        const perp = (Math.random() + Math.random() + Math.random() - 1.5) * height * 0.09
-        milkyWayStars.push({
-          x: mwCx + along * Math.cos(mwAngle) - perp * Math.sin(mwAngle),
-          y: mwCy + along * Math.sin(mwAngle) + perp * Math.cos(mwAngle),
-          r: Math.random() * 0.48 + 0.1,
-          op: Math.random() * 0.22 + 0.04,
-          ph: Math.random() * Math.PI * 2,
         })
       }
     }
@@ -167,28 +106,39 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
       ctx.fillRect(0, 0, width, height)
     }
 
-    function drawMilkyWay() {
-      const mwAngle = -0.35
-      const mwCx = width * 0.5
-      const mwCy = height * 0.45
+    function drawMilkyWay(audioEnergy: number) {
+      const mwAngle = -0.34
+      const mwCx = width * 0.54 + viewportRef.current.x * 0.006
+      const mwCy = height * 0.42 + viewportRef.current.y * 0.004
       const mwPerpX = Math.sin(mwAngle)
       const mwPerpY = -Math.cos(mwAngle)
-      const mwHalf = height * 0.19
-      const mwGrad = ctx.createLinearGradient(mwCx + mwPerpX * mwHalf, mwCy + mwPerpY * mwHalf, mwCx - mwPerpX * mwHalf, mwCy - mwPerpY * mwHalf)
-      mwGrad.addColorStop(0, 'rgba(92,130,230,0)')
-      mwGrad.addColorStop(0.22, 'rgba(92,130,230,0.026)')
-      mwGrad.addColorStop(0.5, 'rgba(132,176,255,0.078)')
-      mwGrad.addColorStop(0.78, 'rgba(92,130,230,0.03)')
-      mwGrad.addColorStop(1, 'rgba(92,130,230,0)')
-      ctx.fillStyle = mwGrad
+      const mwHalf = height * 0.24
+
+      const mainBand = ctx.createLinearGradient(
+        mwCx + mwPerpX * mwHalf,
+        mwCy + mwPerpY * mwHalf,
+        mwCx - mwPerpX * mwHalf,
+        mwCy - mwPerpY * mwHalf,
+      )
+      mainBand.addColorStop(0, 'rgba(92,130,230,0)')
+      mainBand.addColorStop(0.16, 'rgba(92,130,230,0.03)')
+      mainBand.addColorStop(0.5, `rgba(168,198,255,${0.11 + audioEnergy * 0.05})`)
+      mainBand.addColorStop(0.82, 'rgba(92,130,230,0.036)')
+      mainBand.addColorStop(1, 'rgba(92,130,230,0)')
+      ctx.fillStyle = mainBand
       ctx.fillRect(0, 0, width, height)
 
-      for (const star of milkyWayStars) {
-        ctx.beginPath()
-        ctx.arc(star.x, star.y, star.r * 1.18, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(205,222,255,${star.op * 0.98})`
-        ctx.fill()
-      }
+      const warmCore = ctx.createLinearGradient(
+        mwCx + mwPerpX * height * 0.1,
+        mwCy + mwPerpY * height * 0.1,
+        mwCx - mwPerpX * height * 0.1,
+        mwCy - mwPerpY * height * 0.1,
+      )
+      warmCore.addColorStop(0, 'rgba(255,214,150,0)')
+      warmCore.addColorStop(0.5, `rgba(255,214,150,${0.034 + audioEnergy * 0.018})`)
+      warmCore.addColorStop(1, 'rgba(255,214,150,0)')
+      ctx.fillStyle = warmCore
+      ctx.fillRect(0, 0, width, height)
     }
 
     function drawAmbientNebulae(audioBass: number, audioEnergy: number) {
@@ -230,60 +180,6 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
       ctx.fillRect(screenX - radius, screenY - radius, radius * 2, radius * 2)
     }
 
-    function drawParallaxStars(audioEnergy: number) {
-      const layerShift = [
-        { shift: 0.008, scale: 0.018 },
-        { shift: 0.017, scale: 0.028 },
-        { shift: 0.03, scale: 0.038 },
-      ] as const
-      const focusX = viewportRef.current.focusX || width * 0.5
-      const focusY = viewportRef.current.focusY || height * 0.5
-
-      for (const star of stars) {
-        const layerMeta = layerShift[star.layer]
-        star.x += star.driftX
-        star.y += star.driftY
-        if (star.x < -width * 0.12) star.x = width * 1.08
-        else if (star.x > width * 1.08) star.x = -width * 0.12
-        if (star.y < -height * 0.12) star.y = height * 1.08
-        else if (star.y > height * 1.08) star.y = -height * 0.12
-        const twinkle = Math.sin(t * (0.48 + star.layer * 0.14) + star.ph) * 0.5 + 0.5
-        const px = star.x + viewportRef.current.x * layerMeta.shift
-        const py = star.y + viewportRef.current.y * layerMeta.shift
-        const scale = 1 + (viewportRef.current.k - 1) * layerMeta.scale
-        const sx = focusX + (px - focusX) * scale
-        const sy = focusY + (py - focusY) * scale
-        const opacity = star.op * (0.6 + twinkle * 0.28 + audioEnergy * 0.05)
-        const radius = star.r * (0.96 + twinkle * 0.05)
-
-        if (star.glow > 0) {
-          const glowR = star.glow * (0.82 + twinkle * 0.08)
-          const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowR)
-          glow.addColorStop(0, `rgba(${star.col},${opacity * 0.18})`)
-          glow.addColorStop(0.4, `rgba(${star.col},${opacity * 0.06})`)
-          glow.addColorStop(1, `rgba(${star.col},0)`)
-          ctx.fillStyle = glow
-          ctx.fillRect(sx - glowR, sy - glowR, glowR * 2, glowR * 2)
-        }
-
-        ctx.beginPath()
-        ctx.arc(sx, sy, radius, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(${star.col},${opacity})`
-        ctx.fill()
-
-        if (star.layer === 0 && star.r > 1.4) {
-          ctx.strokeStyle = `rgba(${star.col},${opacity * 0.2})`
-          ctx.lineWidth = 0.28
-          ctx.beginPath()
-          ctx.moveTo(sx - star.r * 2.5, sy)
-          ctx.lineTo(sx + star.r * 2.5, sy)
-          ctx.moveTo(sx, sy - star.r * 2.5)
-          ctx.lineTo(sx, sy + star.r * 2.5)
-          ctx.stroke()
-        }
-      }
-    }
-
     function respawnFlightStar(star: FlightStar) {
       const angle = Math.random() * Math.PI * 2
       const spawnInner = Math.min(width, height) * 0.05
@@ -296,13 +192,15 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
     function drawFlightStars(audioBass: number, audioEnergy: number) {
       const focusX = viewportRef.current.focusX || width * 0.5
       const focusY = viewportRef.current.focusY || height * 0.5
+      const maxRadius = Math.max(width, height) * 0.72
       for (const star of flightStars) {
         const dx = star.x - width * 0.5
         const dy = star.y - height * 0.5
         const dist = Math.hypot(dx, dy) || 1
         const ux = dx / dist
         const uy = dy / dist
-        const flightSpeed = 0.028 + star.depth * 0.048 + audioEnergy * 0.01 + audioBass * 0.008
+        const edgeBoost = Math.min(1.25, dist / maxRadius)
+        const flightSpeed = 0.052 + star.depth * 0.082 + edgeBoost * 0.14 + audioEnergy * 0.016 + audioBass * 0.012
         star.x += ux * flightSpeed
         star.y += uy * flightSpeed
 
@@ -318,6 +216,10 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
         const sx = focusX + (star.x - focusX) * bgScale + viewportShiftX
         const sy = focusY + (star.y - focusY) * bgScale + viewportShiftY
         const radius = star.r > 0.8 ? star.r * (0.94 + 0.05 * tw) : star.r
+        const streakStrength = Math.max(0, edgeBoost - 0.22) * (0.72 + star.depth * 0.34)
+        const streakLength = (6 + flightSpeed * 34 + star.depth * 10) * streakStrength
+        const tailX = sx - ux * streakLength
+        const tailY = sy - uy * streakLength
 
         if (star.glow > 0) {
           const glowR = star.glow * (0.88 + 0.08 * tw)
@@ -327,6 +229,19 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
           glow.addColorStop(1, `rgba(${star.col},0)`)
           ctx.fillStyle = glow
           ctx.fillRect(sx - glowR, sy - glowR, glowR * 2, glowR * 2)
+        }
+
+        if (streakLength > 1.5) {
+          const tailGradient = ctx.createLinearGradient(tailX, tailY, sx, sy)
+          tailGradient.addColorStop(0, `rgba(${star.col},0)`)
+          tailGradient.addColorStop(0.52, `rgba(${star.col},${opacity * 0.16})`)
+          tailGradient.addColorStop(1, `rgba(${star.col},${opacity * 0.82})`)
+          ctx.beginPath()
+          ctx.moveTo(tailX, tailY)
+          ctx.lineTo(sx, sy)
+          ctx.strokeStyle = tailGradient
+          ctx.lineWidth = Math.max(0.35, radius * 0.9)
+          ctx.stroke()
         }
 
         ctx.beginPath()
@@ -422,10 +337,9 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
       audioEnergy = audioDataRef.current.energy
 
       drawBackgroundGradient(audioEnergy)
-      drawMilkyWay()
+      drawMilkyWay(audioEnergy)
       drawAmbientNebulae(audioBass, audioEnergy)
       drawActiveRootNebula(audioBass, audioEnergy)
-      drawParallaxStars(audioEnergy)
       drawFlightStars(audioBass, audioEnergy)
       drawShootingStars()
 

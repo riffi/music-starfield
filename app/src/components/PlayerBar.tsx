@@ -32,6 +32,8 @@ export function PlayerBar({
 }: PlayerBarProps) {
   return (
     <div id="player">
+      <div className="player-grid" aria-hidden="true" />
+      <div className="player-corners" aria-hidden="true" />
       <div className="pl-orrery">
         <svg viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg" id="orrery-svg">
           <circle cx="23" cy="23" r="20" fill="none" stroke="rgba(212,168,83,0.12)" strokeWidth="0.8" />
@@ -44,7 +46,10 @@ export function PlayerBar({
         </svg>
       </div>
       <div className="pl-info">
-        <div id="pl-genre">{currentGenre}</div>
+        <div className="pl-headerline">
+          <div id="pl-genre">{currentGenre}</div>
+          <div className="pl-signal">Signal / Live Relay</div>
+        </div>
         <div id="pl-name">{currentName ? <span>{currentName}</span> : <span className="pl-idle">Select a star to begin transmission…</span>}</div>
         {currentTrackTitle ? <div id="pl-track">Now Playing: {currentTrackTitle}</div> : null}
       </div>
@@ -75,7 +80,7 @@ export function PlayerBar({
         <button className="cbtn" id="cb-stop" title="Stop" onClick={onStopAudio}>⏹</button>
       </div>
       <div className="vol-wrap">
-        <span className="vol-ico">♪</span>
+        <span className="vol-ico">Gain</span>
         <input type="range" id="vol" min="0" max="100" value={volume} onChange={(event) => onVolumeChange(Number(event.target.value))} />
       </div>
     </div>
