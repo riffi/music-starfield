@@ -158,6 +158,7 @@ export const styleTaxonomy: StyleTaxon[] = [
 
   { id: 'deephouse', name: 'Deep House', root: 'electronic', kind: 'genre', level: 3, parentId: 'house', isAtlasVisible: true },
   { id: 'proghouse', name: 'Progressive House', root: 'electronic', kind: 'genre', level: 3, parentId: 'house', isAtlasVisible: true },
+  { id: 'techhouse', name: 'Tech House', root: 'electronic', kind: 'genre', level: 3, parentId: 'house', aliases: ['tech-house'], isAtlasVisible: true },
   { id: 'tropicalhouse', name: 'Tropical House', root: 'electronic', kind: 'genre', level: 3, parentId: 'house', isAtlasVisible: true },
   { id: 'industrialtech', name: 'Industrial Techno', root: 'electronic', kind: 'genre', level: 3, parentId: 'techno', isAtlasVisible: true },
   { id: 'minimaltech', name: 'Minimal Techno', root: 'electronic', kind: 'genre', level: 3, parentId: 'techno', isAtlasVisible: true },
@@ -256,6 +257,7 @@ export const styleRelations: StyleRelation[] = [
 
   { id: 'house-parent-deephouse', sourceId: 'house', targetId: 'deephouse', kind: 'parent_of' },
   { id: 'house-parent-proghouse', sourceId: 'house', targetId: 'proghouse', kind: 'parent_of' },
+  { id: 'house-parent-techhouse', sourceId: 'house', targetId: 'techhouse', kind: 'parent_of' },
   { id: 'house-parent-tropicalhouse', sourceId: 'house', targetId: 'tropicalhouse', kind: 'parent_of' },
   { id: 'techno-parent-industrialtech', sourceId: 'techno', targetId: 'industrialtech', kind: 'parent_of' },
   { id: 'techno-parent-minimaltech', sourceId: 'techno', targetId: 'minimaltech', kind: 'parent_of' },
@@ -374,6 +376,15 @@ export const stationBindings: StationBinding[] = [
     bitrateLabel: '320k',
     primaryStyleId: 'proghouse',
     secondaryStyleIds: ['house', 'electronic'],
+  },
+  {
+    id: 'hirschmilch-progressive-house',
+    name: 'Hirschmilch - Progressive House',
+    streamUrl: 'https://hirschmilch.de:7001/prog-house.mp3',
+    countryLabel: 'DE',
+    bitrateLabel: '128k',
+    primaryStyleId: 'proghouse',
+    secondaryStyleIds: ['techhouse'],
   },
   {
     id: 'beat-blender',

@@ -86,7 +86,7 @@ function App() {
   return (
     <>
       <canvas id="starfield" ref={starfieldRef} />
-      <AppHeader roots={atlasData.roots} />
+      <AppHeader />
       <svg id="graph-svg" ref={graph.graphRef} />
       <SidePanel
         open={panelOpen}
