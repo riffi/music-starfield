@@ -1,9 +1,14 @@
 import * as d3 from 'd3'
 import Hls from 'hls.js'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import './App.css'
 import { atlasData } from './data/atlas'
-import { getStationStyleLabels, stationMatchesNode } from './data/selectors'
+import {
+  computeRadioFlowEdgeKeys,
+  getStationStyleLabels,
+  pulseNodeIdsForPlayingStation,
+  stationMatchesNode,
+} from './data/selectors'
 
 type RefNode = {
   id: string
@@ -64,18 +69,38 @@ type SomaChannelsResponse = {
   }[]
 }
 
-function buildWaveformPath(samples: number[], width: number, height: number) {
-  if (!samples.length) return ''
+const SPECTRUM_BAR_COUNT = 28
 
-  const stepX = width / Math.max(samples.length - 1, 1)
-  const midY = height / 2
-  const amplitude = height * 0.36
+/** Static bar heights for idle / decorative spectrum (matches live bar count). */
+const PL_DECO_IDLE_HEIGHTS: readonly number[] = Array.from({ length: SPECTRUM_BAR_COUNT }, (_, i) => {
+  const t = i / Math.max(SPECTRUM_BAR_COUNT - 1, 1)
+  const blend = 0.24 + 0.11 * Math.sin(t * Math.PI * 2.4) + 0.07 * Math.sin(t * Math.PI * 4.8 + 1.1)
+  return Math.round(Math.max(14, Math.min(44, blend * 100)))
+})
 
-  return samples.reduce((path, sample, index) => {
-    const x = index * stepX
-    const y = midY + (sample - 0.5) * amplitude * 2
-    return `${path}${index === 0 ? 'M' : ' L'}${x.toFixed(2)} ${y.toFixed(2)}`
-  }, '')
+function fillAnalyserFrequency(analyser: AnalyserNode, out: Uint8Array) {
+  analyser.getByteFrequencyData(out as Parameters<AnalyserNode['getByteFrequencyData']>[0])
+}
+
+/** Log-ish bin spacing: more resolution in bass, for inline EQ bars. */
+function computeSpectrumLevels(freqData: Uint8Array, barCount: number): number[] {
+  const lo = 2
+  const hi = Math.min(freqData.length - 1, 100)
+  const span = hi - lo
+  const curve = 1.35
+  const levels: number[] = []
+
+  for (let i = 0; i < barCount; i++) {
+    const f0 = lo + span * Math.pow(i / barCount, curve)
+    const f1 = lo + span * Math.pow((i + 1) / barCount, curve)
+    const from = Math.min(hi, Math.floor(f0))
+    const to = Math.min(hi, Math.max(from, Math.floor(f1)))
+    let peak = 0
+    for (let j = from; j <= to; j++) peak = Math.max(peak, freqData[j])
+    levels.push(peak / 255)
+  }
+
+  return levels
 }
 
 function resolvePlayableStreamUrl(stationId: string, streamUrl: string) {
@@ -131,6 +156,7 @@ function App() {
   const waveformFrameRef = useRef<number | null>(null)
   const pulseFrameRef = useRef<number | null>(null)
   const stationPulseIdsRef = useRef<Set<string>>(new Set())
+  const flowEdgeKeysRef = useRef<Set<string>>(new Set())
   const audioDataRef = useRef({ bass: 0, energy: 0 })
   const viewportRef = useRef({ x: 0, y: 0, k: 1, focusX: 0, focusY: 0 })
 
@@ -151,7 +177,7 @@ function App() {
   const [currentTrackTitle, setCurrentTrackTitle] = useState('')
   const [playing, setPlaying] = useState(false)
   const [volume, setVolume] = useState(75)
-  const [waveformSamples, setWaveformSamples] = useState<number[] | null>(null)
+  const [spectrumLevels, setSpectrumLevels] = useState<number[] | null>(null)
 
   const selectedNode = useMemo(() => (selectedId ? atlasData.nodeMap[selectedId] : null), [selectedId])
 
@@ -265,7 +291,7 @@ function App() {
         if (!freqData || freqData.length !== liveAnalyser.frequencyBinCount) {
           freqData = new Uint8Array(liveAnalyser.frequencyBinCount)
         }
-        liveAnalyser.getByteFrequencyData(freqData)
+        fillAnalyserFrequency(liveAnalyser, freqData)
         // Bass = weighted sum of first 3 bins (0–516 Hz)
         audioBass = (freqData[0] * 0.55 + freqData[1] * 0.30 + freqData[2] * 0.15) / 255
         let sum = 0
@@ -468,19 +494,12 @@ function App() {
   }, [])
 
   useEffect(() => {
-    const next = new Set<string>()
-    if (playing && currentStationId) {
-      const station = atlasData.stationMap[currentStationId]
-      let id: string | undefined = station?.primaryStyleId
-      while (id) {
-        next.add(id)
-        id = atlasData.nodeMap[id]?.parentId
-      }
-    }
-    stationPulseIdsRef.current = next
-  }, [playing, currentStationId])
+    const station = playing && currentStationId ? atlasData.stationMap[currentStationId] : undefined
+    stationPulseIdsRef.current = pulseNodeIdsForPlayingStation(station, selectedId)
+    flowEdgeKeysRef.current = computeRadioFlowEdgeKeys(station, selectedId, playing)
+  }, [playing, currentStationId, selectedId])
 
-  // Pulsing nodes — only the playing station's style (L3) and its L2 / L1 ancestors
+  // Pulsing nodes — branch from selected graph node (if station matches it), else all style/descriptor paths
   useEffect(() => {
     let pt = 0
 
@@ -502,22 +521,36 @@ function App() {
             const pulseThis = pulseIds.size > 0 && pulseIds.has(d.id)
 
             if (!pulseThis) {
-              grp.select('circle.gring').attr('opacity', 0)
-              if (d.level === 1) grp.select('circle.gring-mid').attr('opacity', 0)
+              grp.select('circle.gring-halo').attr('opacity', 0)
+              grp.select('circle.gring-rim').attr('opacity', 0)
+              if (d.level === 1) {
+                grp.select('circle.gring-mid-halo').attr('opacity', 0)
+                grp.select('circle.gring-mid-rim').attr('opacity', 0)
+              }
               if (d.level <= 2) grp.select('circle.ncore').attr('r', baseR * 0.38)
               if (d.level === 3) grp.select('circle.nbody').attr('r', baseR)
               return
             }
 
-            grp.select('circle.gring').attr('opacity', 1)
-            if (d.level === 1) grp.select('circle.gring-mid').attr('opacity', 1)
+            const ringFreq = d.level === 1 ? 0.36 : d.level === 2 ? 0.5 : 0.68
+            const ringScale = (1 + Math.sin(pt * ringFreq + phase) * 0.048) * audioRingBoost
+            const haloFillOp = Math.min(0.14 + Math.abs(Math.sin(pt * 0.42 + phase)) * 0.09 + audioOpacityBoost * 0.32, 0.4)
+            const rimStrokeOp = Math.min(0.09 + Math.abs(Math.sin(pt * 0.36 + phase + 0.6)) * 0.05 + audioOpacityBoost * 0.11, 0.2)
 
-            const ringFreq = d.level === 1 ? 0.36 : d.level === 2 ? 0.50 : 0.68
-            const ringScale = (1 + Math.sin(pt * ringFreq + phase) * 0.07) * audioRingBoost
+            grp.select('circle.gring-halo').attr('opacity', 1).attr('r', baseR * 1.56 * ringScale).attr('fill-opacity', haloFillOp)
+
             grp
-              .select('circle.gring')
+              .select('circle.gring-rim')
+              .attr('opacity', 1)
               .attr('r', baseR * 1.9 * ringScale)
-              .attr('stroke-opacity', Math.min(0.13 + Math.abs(Math.sin(pt * 0.42 + phase)) * 0.1 + audioOpacityBoost, 0.72))
+              .attr('stroke-opacity', rimStrokeOp)
+
+            if (d.level === 1) {
+              const midHalo = Math.min(haloFillOp * 1.06, 0.42)
+              const midRim = Math.min(rimStrokeOp * 1.08, 0.22)
+              grp.select('circle.gring-mid-halo').attr('opacity', 1).attr('r', baseR * 1.14 * ringScale).attr('fill-opacity', midHalo)
+              grp.select('circle.gring-mid-rim').attr('opacity', 1).attr('r', baseR * 1.35 * ringScale).attr('stroke-opacity', midRim)
+            }
 
             if (d.level <= 2) {
               const audioCore = 1 + bass * 0.28
@@ -528,6 +561,39 @@ function App() {
             if (d.level === 3) {
               const bodyScale = 1 + Math.sin(pt * 0.88 + phase) * 0.11 + energy * 0.08
               grp.select('circle.nbody').attr('r', baseR * bodyScale)
+            }
+          })
+
+        const flowKeys = flowEdgeKeysRef.current
+        const flowActive = flowKeys.size > 0
+
+        d3.select(svgEl)
+          .selectAll<SVGLineElement, RefLink>('line.edge')
+          .each(function (d) {
+            const src = typeof d.source === 'object' ? d.source : null
+            const tgt = typeof d.target === 'object' ? d.target : null
+            if (!src || !tgt) return
+            const key = `${src.id}>${tgt.id}`
+            const line = d3.select(this)
+
+            if (flowActive && flowKeys.has(key)) {
+              const ln = this as SVGLineElement
+              const len = ln.getTotalLength() || 48
+              const dashLen = Math.max(9, len * 0.065)
+              const gapLen = Math.max(11, len * 0.2)
+              const period = dashLen + gapLen
+              const flowOff = (pt * 44) % period
+              line
+                .style('stroke-dasharray', `${dashLen} ${gapLen}`)
+                .style('stroke-dashoffset', String(-flowOff))
+                .style('stroke-opacity', String(Math.min(0.78, 0.36 + audioOpacityBoost * 0.5)))
+                .style('stroke-width', String(src.level === 1 ? 2.05 : 1.32))
+            } else {
+              line
+                .style('stroke-dasharray', src.level === 1 ? '5,5' : '2,5')
+                .style('stroke-dashoffset', null)
+                .style('stroke-opacity', '0.22')
+                .style('stroke-width', String(src.level === 1 ? 1.4 : 0.9))
             }
           })
       }
@@ -560,26 +626,20 @@ function App() {
 
   useEffect(() => {
     if (!playing || !analyserRef.current) {
-      setWaveformSamples(null)
+      setSpectrumLevels(null)
       if (waveformFrameRef.current) cancelAnimationFrame(waveformFrameRef.current)
       waveformFrameRef.current = null
       return
     }
 
     const analyser = analyserRef.current
-    const timeData = new Uint8Array(analyser.fftSize)
+    const freqData = new Uint8Array(analyser.frequencyBinCount)
 
     const tick = () => {
-      analyser.getByteTimeDomainData(timeData)
-
-      const sampled = Array.from({ length: 40 }, (_, index) => {
-        const dataIndex = Math.floor((index / 39) * (timeData.length - 1))
-        return timeData[dataIndex] / 255
-      })
-
-      const min = Math.min(...sampled)
-      const max = Math.max(...sampled)
-      setWaveformSamples(max - min > 0.025 ? sampled : null)
+      fillAnalyserFrequency(analyser, freqData)
+      const levels = computeSpectrumLevels(freqData, SPECTRUM_BAR_COUNT)
+      const maxLevel = Math.max(...levels)
+      setSpectrumLevels(maxLevel > 0.02 ? levels : null)
 
       waveformFrameRef.current = requestAnimationFrame(tick)
     }
@@ -668,6 +728,21 @@ function App() {
       const merge = filter.append('feMerge')
       merge.append('feMergeNode').attr('in', 'blur')
       merge.append('feMergeNode').attr('in', 'SourceGraphic')
+    })
+
+    /** Audio pulse: soft halo only (no sharp stroke merged on top). */
+    ;['pulseHalo3', 'pulseHalo6', 'pulseHalo10'].forEach((id, index) => {
+      const dev = [5, 8, 12][index]
+      const filter = defs
+        .append('filter')
+        .attr('id', id)
+        .attr('x', '-100%')
+        .attr('y', '-100%')
+        .attr('width', '320%')
+        .attr('height', '320%')
+        .attr('color-interpolation-filters', 'sRGB')
+      filter.append('feGaussianBlur').attr('in', 'SourceGraphic').attr('stdDeviation', dev).attr('result', 'blur')
+      filter.append('feMerge').append('feMergeNode').attr('in', 'blur')
     })
 
     const g = svg.append('g')
@@ -1012,26 +1087,51 @@ function App() {
 
       entered
         .append('circle')
-        .attr('class', 'gring')
+        .attr('class', 'gring-halo')
+        .attr('r', (d) => nr(d) * 1.56)
+        .attr('fill', (d) => nodeColor(d))
+        .attr('fill-opacity', 0.2)
+        .attr('stroke', 'none')
+        .attr('opacity', 0)
+        .attr('pointer-events', 'none')
+        .attr('filter', (d) => (d.level === 1 ? 'url(#pulseHalo10)' : d.level === 2 ? 'url(#pulseHalo6)' : 'url(#pulseHalo3)'))
+
+      entered
+        .append('circle')
+        .attr('class', 'gring-rim')
         .attr('r', (d) => nr(d) * 1.9)
         .attr('fill', 'none')
         .attr('stroke', (d) => nodeColor(d))
-        .attr('stroke-width', 0.5)
-        .attr('stroke-opacity', 0.2)
+        .attr('stroke-width', 0.32)
+        .attr('stroke-linecap', 'round')
+        .attr('stroke-opacity', 0.15)
         .attr('opacity', 0)
-        .attr('filter', (d) => (d.level === 1 ? 'url(#glow10)' : d.level === 2 ? 'url(#glow6)' : 'url(#glow3)'))
+        .attr('pointer-events', 'none')
 
       entered
         .filter((d) => d.level === 1)
         .append('circle')
-        .attr('class', 'gring-mid')
+        .attr('class', 'gring-mid-halo')
+        .attr('r', (d) => nr(d) * 1.14)
+        .attr('fill', (d) => nodeColor(d))
+        .attr('fill-opacity', 0.22)
+        .attr('stroke', 'none')
+        .attr('opacity', 0)
+        .attr('pointer-events', 'none')
+        .attr('filter', 'url(#pulseHalo6)')
+
+      entered
+        .filter((d) => d.level === 1)
+        .append('circle')
+        .attr('class', 'gring-mid-rim')
         .attr('r', (d) => nr(d) * 1.35)
         .attr('fill', 'none')
         .attr('stroke', (d) => nodeColor(d))
-        .attr('stroke-width', 0.6)
-        .attr('stroke-opacity', 0.4)
+        .attr('stroke-width', 0.28)
+        .attr('stroke-linecap', 'round')
+        .attr('stroke-opacity', 0.16)
         .attr('opacity', 0)
-        .attr('filter', 'url(#glow6)')
+        .attr('pointer-events', 'none')
 
       entered
         .append('circle')
@@ -1215,8 +1315,6 @@ function App() {
     return atlasData.stations.filter((station) => stationMatchesNode(station, selectedNode.id))
   }, [selectedNode])
 
-  const realWavePath = useMemo(() => (waveformSamples ? buildWaveformPath(waveformSamples, 180, 28) : ''), [waveformSamples])
-
   function clearCurrentStream() {
     hlsRef.current?.destroy()
     hlsRef.current = null
@@ -1248,7 +1346,7 @@ function App() {
       if (!analyserRef.current) {
         const analyser = audioContextRef.current.createAnalyser()
         analyser.fftSize = 256
-        analyser.smoothingTimeConstant = 0.82
+        analyser.smoothingTimeConstant = 0.72
         mediaSourceRef.current.connect(analyser)
         analyser.connect(audioContextRef.current.destination)
         analyserRef.current = analyser
@@ -1257,7 +1355,7 @@ function App() {
       return true
     } catch {
       analyserRef.current = null
-      setWaveformSamples(null)
+      setSpectrumLevels(null)
       return false
     }
   }
@@ -1450,21 +1548,25 @@ function App() {
           <div id="pl-name">{currentName ? <span>{currentName}</span> : <span className="pl-idle">Select a star to begin transmission…</span>}</div>
           {currentTrackTitle ? <div id="pl-track">Now Playing: {currentTrackTitle}</div> : null}
         </div>
-        <div className={`pl-wave ${waveformSamples ? 'pl-wave-real' : `pl-wave-${waveformState}`}`} aria-hidden="true">
-          <svg viewBox="0 0 180 28" xmlns="http://www.w3.org/2000/svg">
-            {waveformSamples ? (
-              <>
-                <path className="wave-glow wave-glow-real" d={realWavePath} />
-                <path className="wave-line wave-line-real" d={realWavePath} />
-              </>
-            ) : (
-              <>
-                <path className="wave-glow" d="M2 14 C10 14, 14 9, 22 9 S34 19, 42 19 S54 10, 62 10 S74 18, 82 18 S94 11, 102 11 S114 17, 122 17 S134 12, 142 12 S154 16, 162 16 S170 14, 178 14" />
-                <path className="wave-line wave-line-a" d="M2 14 C10 14, 14 9, 22 9 S34 19, 42 19 S54 10, 62 10 S74 18, 82 18 S94 11, 102 11 S114 17, 122 17 S134 12, 142 12 S154 16, 162 16 S170 14, 178 14" />
-                <path className="wave-line wave-line-b" d="M2 14 C10 14, 14 16, 22 16 S34 8, 42 8 S54 17, 62 17 S74 9, 82 9 S94 16, 102 16 S114 10, 122 10 S134 15, 142 15 S154 11, 162 11 S170 14, 178 14" />
-              </>
-            )}
-          </svg>
+        <div className={`pl-wave ${spectrumLevels ? 'pl-wave-real' : `pl-wave-${waveformState}`}`} aria-hidden="true">
+          {spectrumLevels ? (
+            <div className="pl-spectrum">
+              {spectrumLevels.map((v, i) => {
+                const h = Math.round(Math.max(6, Math.min(100, 6 + v * 118)))
+                return <div key={i} className="pl-spectrum-bar" style={{ height: `${h}%` }} />
+              })}
+            </div>
+          ) : (
+            <div className="pl-spectrum pl-spectrum-deco">
+              {PL_DECO_IDLE_HEIGHTS.map((h, i) => (
+                <div
+                  key={i}
+                  className="pl-spectrum-bar"
+                  style={{ height: `${h}%`, ['--pl-bar-i' as string]: String(i) } as CSSProperties}
+                />
+              ))}
+            </div>
+          )}
         </div>
         <div className="pl-ctrls">
           <button className={`cbtn${playing ? ' on' : ''}${loadingStationId ? ' loading' : ''}`} id="cb-pause" title="Pause / Resume" onClick={toggleAudio}>
