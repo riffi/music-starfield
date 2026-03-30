@@ -1,4 +1,5 @@
 import * as d3 from 'd3'
+import Hls from 'hls.js'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { atlasData } from './data/atlas'
@@ -41,12 +42,67 @@ const levelLabels = {
   3: 'Stellar Body',
 } as const
 
+const SOMAFM_CHANNELS: Record<string, string> = {
+  'drone-zone': 'dronezone',
+  'deep-space-one': 'deepspaceone',
+  'space-station': 'spacestation',
+  'mission-control': 'missioncontrol',
+  'groove-salad': 'groovesalad',
+  lush: 'lush',
+  'beat-blender': 'beatblender',
+  'indie-pop-rocks': 'indiepop',
+  digitalis: 'digitalis',
+  'n5md-radio': 'n5md',
+  'underground-80s': 'u80s',
+  'sonic-universe': 'sonicuniverse',
+  bossa: 'bossa',
+}
+
+type SomaChannelsResponse = {
+  channels?: {
+    id: string
+    lastPlaying?: string
+  }[]
+}
+
+async function loadSoundparkDeepNowPlaying() {
+  const masterResponse = await fetch('https://h.getradio.me/spdeep/hls.m3u8')
+  if (!masterResponse.ok) throw new Error(`Soundpark master returned ${masterResponse.status}`)
+
+  const masterText = await masterResponse.text()
+  const variantPath = masterText
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line && !line.startsWith('#'))
+
+  if (!variantPath) return ''
+
+  const mediaUrl = new URL(variantPath, masterResponse.url).toString()
+  const mediaResponse = await fetch(mediaUrl)
+  if (!mediaResponse.ok) throw new Error(`Soundpark media returned ${mediaResponse.status}`)
+
+  const mediaText = await mediaResponse.text()
+  const extInfLines = mediaText
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('#EXTINF:'))
+
+  const lastLine = extInfLines.at(-1)
+  if (!lastLine) return ''
+
+  const separatorIndex = lastLine.indexOf(',')
+  if (separatorIndex === -1) return ''
+
+  return lastLine.slice(separatorIndex + 1).trim()
+}
+
 function App() {
   const graphRef = useRef<SVGSVGElement | null>(null)
   const starfieldRef = useRef<HTMLCanvasElement | null>(null)
   const animationRef = useRef<number | null>(null)
   const orreryRef = useRef<SVGCircleElement | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const hlsRef = useRef<Hls | null>(null)
   const viewportRef = useRef({ x: 0, y: 0, k: 1, focusX: 0, focusY: 0 })
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -60,8 +116,10 @@ function App() {
     y: number
   } | null>(null)
   const [currentStationId, setCurrentStationId] = useState<string | null>(null)
+  const [loadingStationId, setLoadingStationId] = useState<string | null>(null)
   const [currentGenre, setCurrentGenre] = useState('')
   const [currentName, setCurrentName] = useState('')
+  const [currentTrackTitle, setCurrentTrackTitle] = useState('')
   const [playing, setPlaying] = useState(false)
   const [volume, setVolume] = useState(75)
 
@@ -237,6 +295,56 @@ function App() {
     if (!audioRef.current) audioRef.current = new Audio()
     audioRef.current.volume = volume / 100
   }, [volume])
+
+  useEffect(() => {
+    return () => {
+      hlsRef.current?.destroy()
+      hlsRef.current = null
+      audioRef.current?.pause()
+    }
+  }, [])
+
+  useEffect(() => {
+    const channelId = currentStationId ? SOMAFM_CHANNELS[currentStationId] : undefined
+    const isSoundparkDeep = currentStationId === 'soundpark-deep'
+
+    if (!channelId && !isSoundparkDeep) {
+      setCurrentTrackTitle('')
+      return
+    }
+
+    let cancelled = false
+
+    async function loadNowPlaying() {
+      try {
+        if (channelId) {
+          const response = await fetch('https://somafm.com/channels.json')
+          if (!response.ok) throw new Error(`SomaFM returned ${response.status}`)
+          const data = (await response.json()) as SomaChannelsResponse
+          const channel = data.channels?.find((item) => item.id === channelId)
+          if (!cancelled) setCurrentTrackTitle(channel?.lastPlaying?.trim() ?? '')
+          return
+        }
+
+        if (isSoundparkDeep) {
+          const trackTitle = await loadSoundparkDeepNowPlaying()
+          if (!cancelled) setCurrentTrackTitle(trackTitle)
+        }
+      } catch {
+        if (!cancelled) setCurrentTrackTitle('')
+      }
+    }
+
+    void loadNowPlaying()
+    const interval = window.setInterval(() => {
+      void loadNowPlaying()
+    }, 20000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [currentStationId])
 
   useEffect(() => {
     const svgEl = graphRef.current
@@ -627,13 +735,56 @@ function App() {
     return atlasData.stations.filter((station) => station.styleIds.includes(selectedNode.id))
   }, [selectedNode])
 
-  function playStation(station: (typeof panelStations)[number]) {
+  function clearCurrentStream() {
+    hlsRef.current?.destroy()
+    hlsRef.current = null
+
+    if (!audioRef.current) return
+    audioRef.current.pause()
+    audioRef.current.removeAttribute('src')
+    audioRef.current.load()
+  }
+
+  async function startStream(streamUrl: string) {
+    if (!audioRef.current) return false
+
+    clearCurrentStream()
+
+    const isHlsStream = streamUrl.includes('.m3u8')
+    if (isHlsStream) {
+      if (audioRef.current.canPlayType('application/vnd.apple.mpegurl')) {
+        audioRef.current.src = streamUrl
+      } else if (Hls.isSupported()) {
+        const hls = new Hls()
+        hls.loadSource(streamUrl)
+        hls.attachMedia(audioRef.current)
+        hlsRef.current = hls
+      } else {
+        return false
+      }
+    } else {
+      audioRef.current.src = streamUrl
+    }
+
+    try {
+      await audioRef.current.play()
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  async function playStation(station: (typeof panelStations)[number]) {
     if (!audioRef.current || !selectedNode) return
 
     if (currentStationId === station.id) {
       if (audioRef.current.paused) {
-        void audioRef.current.play()
-        setPlaying(true)
+        setLoadingStationId(station.id)
+        void audioRef.current
+          .play()
+          .then(() => setPlaying(true))
+          .catch(() => setPlaying(false))
+          .finally(() => setLoadingStationId(null))
       } else {
         audioRef.current.pause()
         setPlaying(false)
@@ -641,22 +792,24 @@ function App() {
       return
     }
 
-    audioRef.current.pause()
-    audioRef.current.src = station.streamUrl
-    audioRef.current.load()
-    void audioRef.current.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
+    setLoadingStationId(station.id)
     setCurrentStationId(station.id)
     setCurrentGenre(selectedNode.name)
     setCurrentName(station.name)
+    setCurrentTrackTitle('')
+    const started = await startStream(station.streamUrl)
+    setPlaying(started)
+    setLoadingStationId(null)
   }
 
   function stopAudio() {
     if (!audioRef.current) return
-    audioRef.current.pause()
-    audioRef.current.src = ''
+    clearCurrentStream()
+    setLoadingStationId(null)
     setCurrentStationId(null)
     setCurrentGenre('')
     setCurrentName('')
+    setCurrentTrackTitle('')
     setPlaying(false)
   }
 
@@ -709,6 +862,7 @@ function App() {
               </div>
               {panelStations.map((station) => {
                 const active = currentStationId === station.id
+                const loading = loadingStationId === station.id
                 return (
                   <div key={station.id} className={`s-card${active ? ' playing' : ''}`}>
                     <div className="s-name">{station.name}</div>
@@ -716,8 +870,8 @@ function App() {
                       <span className="s-country">{station.countryLabel === 'US' ? '🇺🇸 US' : station.countryLabel}</span>
                       <span className="s-br">{station.bitrateLabel}</span>
                     </div>
-                    <button className={`pbtn${active ? ' on' : ''}`} onClick={() => playStation(station)}>
-                      {active && playing ? '⏸' : '▶'}
+                    <button className={`pbtn${active ? ' on' : ''}${loading ? ' loading' : ''}`} onClick={() => void playStation(station)}>
+                      {loading ? <span className="btn-spinner" /> : active && playing ? '⏸' : '▶'}
                     </button>
                   </div>
                 )
@@ -751,6 +905,7 @@ function App() {
         <div className="pl-info">
           <div id="pl-genre">{currentGenre}</div>
           <div id="pl-name">{currentName ? <span>{currentName}</span> : <span className="pl-idle">Select a star to begin transmission…</span>}</div>
+          {currentTrackTitle ? <div id="pl-track">Now Playing: {currentTrackTitle}</div> : null}
         </div>
         <div className="pl-bars" id="pl-bars">
           <div className={`bar${playing ? ' on' : ''}`} />
@@ -760,7 +915,9 @@ function App() {
           <div className={`bar${playing ? ' on' : ''}`} />
         </div>
         <div className="pl-ctrls">
-          <button className={`cbtn${playing ? ' on' : ''}`} id="cb-pause" title="Pause / Resume" onClick={toggleAudio}>⏸</button>
+          <button className={`cbtn${playing ? ' on' : ''}${loadingStationId ? ' loading' : ''}`} id="cb-pause" title="Pause / Resume" onClick={toggleAudio}>
+            {loadingStationId ? <span className="btn-spinner" /> : playing ? '⏸' : '▶'}
+          </button>
           <button className="cbtn" id="cb-stop" title="Stop" onClick={stopAudio}>⏹</button>
         </div>
         <div className="vol-wrap">
