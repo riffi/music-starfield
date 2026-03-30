@@ -1,4 +1,22 @@
-export type TaxonomyRoot = 'ambient' | 'electronic' | 'rock' | 'jazz' | 'classical'
+export type TaxonomyRoot =
+  | 'ambient_newage'
+  | 'electronic'
+  | 'rock'
+  | 'pop'
+  | 'hiphop'
+  | 'rnb_soul_funk'
+  | 'jazz'
+  | 'classical'
+  | 'metal'
+  | 'punk_hardcore'
+  | 'folk_country_world'
+  | 'latin'
+  | 'reggae_ska_dub'
+  | 'blues'
+  | 'soundtrack_stage'
+  | 'experimental_noise'
+
+export type TaxonKind = 'genre' | 'style' | 'descriptor' | 'form' | 'instrument' | 'period'
 
 export type RelationKind = 'parent_of' | 'related_to' | 'influenced_by' | 'fusion_of'
 
@@ -6,8 +24,11 @@ export type StyleTaxon = {
   id: string
   name: string
   root: TaxonomyRoot
+  kind: TaxonKind
   level: 1 | 2 | 3
   parentId?: string
+  aliases?: string[]
+  isAtlasVisible?: boolean
 }
 
 export type StyleRelation = {
@@ -23,77 +44,147 @@ export type StationBinding = {
   streamUrl: string
   countryLabel: string
   bitrateLabel: string
-  styleIds: string[]
+  primaryStyleId: string
+  secondaryStyleIds?: string[]
+  descriptorIds?: string[]
 }
 
 export const rootColors: Record<TaxonomyRoot, string> = {
-  ambient: '#d4a853',
+  ambient_newage: '#d4a853',
   electronic: '#5a90d4',
   rock: '#c94848',
+  pop: '#ff7aa2',
+  hiphop: '#a96c3e',
+  rnb_soul_funk: '#d96f3d',
   jazz: '#9c5ad4',
   classical: '#7fd1c8',
+  metal: '#8b8f9b',
+  punk_hardcore: '#f05a50',
+  folk_country_world: '#88b36b',
+  latin: '#f29f4b',
+  reggae_ska_dub: '#7bbd5d',
+  blues: '#4c78c9',
+  soundtrack_stage: '#c8a970',
+  experimental_noise: '#7a68c7',
 }
 
 export const styleTaxonomy: StyleTaxon[] = [
-  { id: 'ambient', name: 'Ambient', root: 'ambient', level: 1 },
-  { id: 'electronic', name: 'Electronic', root: 'electronic', level: 1 },
-  { id: 'rock', name: 'Rock', root: 'rock', level: 1 },
-  { id: 'jazz', name: 'Jazz', root: 'jazz', level: 1 },
-  { id: 'classical', name: 'Classical', root: 'classical', level: 1 },
+  { id: 'ambient', name: 'Ambient & New Age', root: 'ambient_newage', kind: 'genre', level: 1, isAtlasVisible: true },
+  { id: 'electronic', name: 'Electronic', root: 'electronic', kind: 'genre', level: 1, isAtlasVisible: true },
+  { id: 'rock', name: 'Rock', root: 'rock', kind: 'genre', level: 1, isAtlasVisible: true },
+  { id: 'pop', name: 'Pop', root: 'pop', kind: 'genre', level: 1 },
+  { id: 'hiphop', name: 'Hip-Hop', root: 'hiphop', kind: 'genre', level: 1 },
+  { id: 'rnbsoulfunk', name: 'R&B, Soul & Funk', root: 'rnb_soul_funk', kind: 'genre', level: 1 },
+  { id: 'jazz', name: 'Jazz', root: 'jazz', kind: 'genre', level: 1, isAtlasVisible: true },
+  { id: 'classical', name: 'Classical', root: 'classical', kind: 'genre', level: 1, isAtlasVisible: true },
+  { id: 'metal', name: 'Metal', root: 'metal', kind: 'genre', level: 1 },
+  { id: 'punkhardcore', name: 'Punk & Hardcore', root: 'punk_hardcore', kind: 'genre', level: 1 },
+  { id: 'folkcountryworld', name: 'Folk, Country & World', root: 'folk_country_world', kind: 'genre', level: 1 },
+  { id: 'latin', name: 'Latin', root: 'latin', kind: 'genre', level: 1 },
+  { id: 'reggaeskadub', name: 'Reggae, Ska & Dub', root: 'reggae_ska_dub', kind: 'genre', level: 1 },
+  { id: 'blues', name: 'Blues', root: 'blues', kind: 'genre', level: 1 },
+  { id: 'soundtrackstage', name: 'Soundtrack & Stage', root: 'soundtrack_stage', kind: 'genre', level: 1 },
+  { id: 'experimentalnoise', name: 'Experimental & Noise', root: 'experimental_noise', kind: 'genre', level: 1 },
 
-  { id: 'newage', name: 'New Age', root: 'ambient', level: 2, parentId: 'ambient' },
-  { id: 'darkambient', name: 'Dark Ambient', root: 'ambient', level: 2, parentId: 'ambient' },
-  { id: 'spaceambient', name: 'Space Ambient', root: 'ambient', level: 2, parentId: 'ambient' },
+  { id: 'newage', name: 'New Age', root: 'ambient_newage', kind: 'genre', level: 2, parentId: 'ambient', isAtlasVisible: true },
+  { id: 'darkambient', name: 'Dark Ambient', root: 'ambient_newage', kind: 'style', level: 2, parentId: 'ambient', isAtlasVisible: true },
+  { id: 'spaceambient', name: 'Space Ambient', root: 'ambient_newage', kind: 'style', level: 2, parentId: 'ambient', isAtlasVisible: true },
 
-  { id: 'house', name: 'House', root: 'electronic', level: 2, parentId: 'electronic' },
-  { id: 'techno', name: 'Techno', root: 'electronic', level: 2, parentId: 'electronic' },
-  { id: 'trance', name: 'Trance', root: 'electronic', level: 2, parentId: 'electronic' },
-  { id: 'eurodance', name: 'Eurodance', root: 'electronic', level: 2, parentId: 'electronic' },
-  { id: 'ukgarage', name: 'UK Garage', root: 'electronic', level: 2, parentId: 'electronic' },
-  { id: 'breaks', name: 'Breaks', root: 'electronic', level: 2, parentId: 'electronic' },
-  { id: 'drumandbass', name: 'Drum & Bass', root: 'electronic', level: 2, parentId: 'electronic' },
-  { id: 'triphop', name: 'Trip-Hop', root: 'electronic', level: 2, parentId: 'electronic' },
-  { id: 'chillout', name: 'Chillout', root: 'electronic', level: 2, parentId: 'electronic' },
-  { id: 'lounge', name: 'Lounge', root: 'electronic', level: 2, parentId: 'electronic' },
+  { id: 'house', name: 'House', root: 'electronic', kind: 'genre', level: 2, parentId: 'electronic', isAtlasVisible: true },
+  { id: 'techno', name: 'Techno', root: 'electronic', kind: 'genre', level: 2, parentId: 'electronic', isAtlasVisible: true },
+  { id: 'trance', name: 'Trance', root: 'electronic', kind: 'genre', level: 2, parentId: 'electronic', isAtlasVisible: true },
+  { id: 'eurodance', name: 'Eurodance', root: 'electronic', kind: 'genre', level: 2, parentId: 'electronic', isAtlasVisible: true },
+  { id: 'ukgarage', name: 'UK Garage', root: 'electronic', kind: 'genre', level: 2, parentId: 'electronic', isAtlasVisible: true },
+  { id: 'breaks', name: 'Breaks', root: 'electronic', kind: 'genre', level: 2, parentId: 'electronic', isAtlasVisible: true },
+  { id: 'drumandbass', name: 'Drum & Bass', root: 'electronic', kind: 'genre', level: 2, parentId: 'electronic', isAtlasVisible: true },
+  { id: 'downtempo', name: 'Downtempo', root: 'electronic', kind: 'genre', level: 2, parentId: 'electronic', isAtlasVisible: true },
+  { id: 'chillout', name: 'Chillout', root: 'electronic', kind: 'descriptor', level: 2, parentId: 'electronic', isAtlasVisible: true },
+  { id: 'lounge', name: 'Lounge', root: 'electronic', kind: 'descriptor', level: 2, parentId: 'electronic', isAtlasVisible: true },
 
-  { id: 'hardrock', name: 'Hard Rock', root: 'rock', level: 2, parentId: 'rock' },
-  { id: 'alternativerock', name: 'Alternative Rock', root: 'rock', level: 2, parentId: 'rock' },
-  { id: 'indierock', name: 'Indie Rock', root: 'rock', level: 2, parentId: 'rock' },
-  { id: 'postrock', name: 'Post-Rock', root: 'rock', level: 2, parentId: 'rock' },
+  { id: 'hardrock', name: 'Hard Rock', root: 'rock', kind: 'genre', level: 2, parentId: 'rock', isAtlasVisible: true },
+  { id: 'alternativerock', name: 'Alternative Rock', root: 'rock', kind: 'genre', level: 2, parentId: 'rock', isAtlasVisible: true },
+  { id: 'indierock', name: 'Indie Rock', root: 'rock', kind: 'genre', level: 2, parentId: 'rock', isAtlasVisible: true },
+  { id: 'postrock', name: 'Post-Rock', root: 'rock', kind: 'genre', level: 2, parentId: 'rock', isAtlasVisible: true },
 
-  { id: 'smoothjazz', name: 'Smooth Jazz', root: 'jazz', level: 2, parentId: 'jazz' },
-  { id: 'nujazz', name: 'Nu Jazz', root: 'jazz', level: 2, parentId: 'jazz' },
-  { id: 'bossanova', name: 'Bossa Nova', root: 'jazz', level: 2, parentId: 'jazz' },
-  { id: 'piano', name: 'Piano', root: 'classical', level: 2, parentId: 'classical' },
-  { id: 'baroqueopera', name: 'Baroque & Opera', root: 'classical', level: 2, parentId: 'classical' },
+  { id: 'synthpop', name: 'Synthpop', root: 'pop', kind: 'genre', level: 2, parentId: 'pop' },
+  { id: 'indiepop', name: 'Indie Pop', root: 'pop', kind: 'genre', level: 2, parentId: 'pop' },
+  { id: 'dancepop', name: 'Dance-Pop', root: 'pop', kind: 'genre', level: 2, parentId: 'pop' },
 
-  { id: 'deephouse', name: 'Deep House', root: 'electronic', level: 3, parentId: 'house' },
-  { id: 'proghouse', name: 'Progressive House', root: 'electronic', level: 3, parentId: 'house' },
-  { id: 'tropicalhouse', name: 'Tropical House', root: 'electronic', level: 3, parentId: 'house' },
-  { id: 'industrialtech', name: 'Industrial Techno', root: 'electronic', level: 3, parentId: 'techno' },
-  { id: 'minimaltech', name: 'Minimal Techno', root: 'electronic', level: 3, parentId: 'techno' },
-  { id: 'futuregarage', name: 'Future Garage', root: 'electronic', level: 3, parentId: 'ukgarage' },
-  { id: 'dubstep', name: 'Dubstep', root: 'electronic', level: 3, parentId: 'ukgarage' },
-  { id: 'liquidfunk', name: 'Liquid Funk', root: 'electronic', level: 3, parentId: 'drumandbass' },
-  { id: 'downtempo', name: 'Downtempo', root: 'electronic', level: 3, parentId: 'chillout' },
-  { id: 'vocalchillout', name: 'Vocal Chillout', root: 'electronic', level: 3, parentId: 'chillout' },
-  { id: 'psybient', name: 'Psybient', root: 'electronic', level: 3, parentId: 'chillout' },
-  { id: 'lofi', name: 'Lo-Fi Chill', root: 'electronic', level: 3, parentId: 'chillout' },
+  { id: 'instrumentalhiphop', name: 'Instrumental Hip-Hop', root: 'hiphop', kind: 'genre', level: 2, parentId: 'hiphop' },
+  { id: 'trap', name: 'Trap', root: 'hiphop', kind: 'genre', level: 2, parentId: 'hiphop' },
+  { id: 'boombap', name: 'Boom Bap', root: 'hiphop', kind: 'genre', level: 2, parentId: 'hiphop' },
 
-  { id: 'shoegaze', name: 'Shoegaze', root: 'rock', level: 3, parentId: 'indierock' },
-  { id: 'dreampop', name: 'Dream Pop', root: 'rock', level: 3, parentId: 'alternativerock' },
-  { id: 'arenarock', name: 'Arena Rock', root: 'rock', level: 3, parentId: 'hardrock' },
+  { id: 'rnb', name: 'R&B', root: 'rnb_soul_funk', kind: 'genre', level: 2, parentId: 'rnbsoulfunk' },
+  { id: 'neosoul', name: 'Neo Soul', root: 'rnb_soul_funk', kind: 'genre', level: 2, parentId: 'rnbsoulfunk' },
+  { id: 'funk', name: 'Funk', root: 'rnb_soul_funk', kind: 'genre', level: 2, parentId: 'rnbsoulfunk' },
+  { id: 'soul', name: 'Soul', root: 'rnb_soul_funk', kind: 'genre', level: 2, parentId: 'rnbsoulfunk' },
 
-  { id: 'contemjazz', name: 'Contemporary Jazz', root: 'jazz', level: 3, parentId: 'smoothjazz' },
-  { id: 'acidjazz', name: 'Acid Jazz', root: 'jazz', level: 3, parentId: 'nujazz' },
-  { id: 'neosouljazz', name: 'Neo Soul Jazz', root: 'jazz', level: 3, parentId: 'nujazz' },
-  { id: 'cafejazz', name: 'Cafe Jazz', root: 'jazz', level: 3, parentId: 'bossanova' },
+  { id: 'smoothjazz', name: 'Smooth Jazz', root: 'jazz', kind: 'genre', level: 2, parentId: 'jazz', isAtlasVisible: true },
+  { id: 'nujazz', name: 'Nu Jazz', root: 'jazz', kind: 'genre', level: 2, parentId: 'jazz', isAtlasVisible: true },
+  { id: 'latinjazz', name: 'Latin Jazz', root: 'jazz', kind: 'genre', level: 2, parentId: 'jazz' },
+
+  { id: 'piano', name: 'Piano', root: 'classical', kind: 'instrument', level: 2, parentId: 'classical', isAtlasVisible: true },
+  { id: 'opera', name: 'Opera', root: 'classical', kind: 'form', level: 2, parentId: 'classical' },
+  { id: 'baroque', name: 'Baroque', root: 'classical', kind: 'period', level: 2, parentId: 'classical' },
+
+  { id: 'heavymetal', name: 'Heavy Metal', root: 'metal', kind: 'genre', level: 2, parentId: 'metal' },
+  { id: 'doommetal', name: 'Doom Metal', root: 'metal', kind: 'genre', level: 2, parentId: 'metal' },
+  { id: 'blackmetal', name: 'Black Metal', root: 'metal', kind: 'genre', level: 2, parentId: 'metal' },
+
+  { id: 'punk', name: 'Punk', root: 'punk_hardcore', kind: 'genre', level: 2, parentId: 'punkhardcore' },
+  { id: 'postpunk', name: 'Post-Punk', root: 'punk_hardcore', kind: 'genre', level: 2, parentId: 'punkhardcore' },
+  { id: 'hardcore', name: 'Hardcore', root: 'punk_hardcore', kind: 'genre', level: 2, parentId: 'punkhardcore' },
+
+  { id: 'folk', name: 'Folk', root: 'folk_country_world', kind: 'genre', level: 2, parentId: 'folkcountryworld' },
+  { id: 'country', name: 'Country', root: 'folk_country_world', kind: 'genre', level: 2, parentId: 'folkcountryworld' },
+  { id: 'world', name: 'World', root: 'folk_country_world', kind: 'genre', level: 2, parentId: 'folkcountryworld' },
+
+  { id: 'samba', name: 'Samba', root: 'latin', kind: 'genre', level: 2, parentId: 'latin' },
+  { id: 'bossanova', name: 'Bossa Nova', root: 'latin', kind: 'genre', level: 2, parentId: 'latin', isAtlasVisible: true },
+
+  { id: 'reggae', name: 'Reggae', root: 'reggae_ska_dub', kind: 'genre', level: 2, parentId: 'reggaeskadub' },
+  { id: 'dub', name: 'Dub', root: 'reggae_ska_dub', kind: 'genre', level: 2, parentId: 'reggaeskadub' },
+  { id: 'ska', name: 'Ska', root: 'reggae_ska_dub', kind: 'genre', level: 2, parentId: 'reggaeskadub' },
+
+  { id: 'electricblues', name: 'Electric Blues', root: 'blues', kind: 'genre', level: 2, parentId: 'blues' },
+  { id: 'bluesrock', name: 'Blues Rock', root: 'blues', kind: 'genre', level: 2, parentId: 'blues' },
+
+  { id: 'soundtrack', name: 'Soundtrack', root: 'soundtrack_stage', kind: 'genre', level: 2, parentId: 'soundtrackstage' },
+  { id: 'musical', name: 'Musical', root: 'soundtrack_stage', kind: 'form', level: 2, parentId: 'soundtrackstage' },
+
+  { id: 'industrial', name: 'Industrial', root: 'experimental_noise', kind: 'genre', level: 2, parentId: 'experimentalnoise' },
+  { id: 'noise', name: 'Noise', root: 'experimental_noise', kind: 'genre', level: 2, parentId: 'experimentalnoise' },
+  { id: 'drone', name: 'Drone', root: 'experimental_noise', kind: 'genre', level: 2, parentId: 'experimentalnoise' },
+
+  { id: 'deephouse', name: 'Deep House', root: 'electronic', kind: 'genre', level: 3, parentId: 'house', isAtlasVisible: true },
+  { id: 'proghouse', name: 'Progressive House', root: 'electronic', kind: 'genre', level: 3, parentId: 'house', isAtlasVisible: true },
+  { id: 'tropicalhouse', name: 'Tropical House', root: 'electronic', kind: 'genre', level: 3, parentId: 'house', isAtlasVisible: true },
+  { id: 'industrialtech', name: 'Industrial Techno', root: 'electronic', kind: 'genre', level: 3, parentId: 'techno', isAtlasVisible: true },
+  { id: 'minimaltech', name: 'Minimal Techno', root: 'electronic', kind: 'genre', level: 3, parentId: 'techno', isAtlasVisible: true },
+  { id: 'futuregarage', name: 'Future Garage', root: 'electronic', kind: 'genre', level: 3, parentId: 'ukgarage', isAtlasVisible: true },
+  { id: 'dubstep', name: 'Dubstep', root: 'electronic', kind: 'genre', level: 3, parentId: 'ukgarage', isAtlasVisible: true },
+  { id: 'liquidfunk', name: 'Liquid Funk', root: 'electronic', kind: 'genre', level: 3, parentId: 'drumandbass', isAtlasVisible: true },
+  { id: 'triphop', name: 'Trip-Hop', root: 'electronic', kind: 'genre', level: 3, parentId: 'downtempo', isAtlasVisible: true },
+  { id: 'psybient', name: 'Psybient', root: 'ambient_newage', kind: 'genre', level: 3, parentId: 'ambient', isAtlasVisible: true },
+  { id: 'vocalchillout', name: 'Vocal Chillout', root: 'electronic', kind: 'descriptor', level: 3, parentId: 'chillout', isAtlasVisible: true },
+  { id: 'lofihiphop', name: 'Lo-Fi Hip-Hop', root: 'hiphop', kind: 'genre', level: 3, parentId: 'instrumentalhiphop' },
+  { id: 'lofichill', name: 'Lo-Fi Chill', root: 'electronic', kind: 'descriptor', level: 3, parentId: 'chillout', aliases: ['lo-fi chill'], isAtlasVisible: true },
+
+  { id: 'shoegaze', name: 'Shoegaze', root: 'rock', kind: 'genre', level: 3, parentId: 'indierock', isAtlasVisible: true },
+  { id: 'dreampop', name: 'Dream Pop', root: 'pop', kind: 'genre', level: 3, parentId: 'indiepop', isAtlasVisible: true },
+  { id: 'arenarock', name: 'Arena Rock', root: 'rock', kind: 'genre', level: 3, parentId: 'hardrock', isAtlasVisible: true },
+
+  { id: 'contemjazz', name: 'Contemporary Jazz', root: 'jazz', kind: 'genre', level: 3, parentId: 'smoothjazz', isAtlasVisible: true },
+  { id: 'acidjazz', name: 'Acid Jazz', root: 'jazz', kind: 'genre', level: 3, parentId: 'nujazz', isAtlasVisible: true },
+  { id: 'neosouljazz', name: 'Neo Soul Jazz', root: 'jazz', kind: 'genre', level: 3, parentId: 'nujazz', isAtlasVisible: true },
+  { id: 'cafejazz', name: 'Cafe Jazz', root: 'jazz', kind: 'descriptor', level: 3, parentId: 'smoothjazz', isAtlasVisible: true },
 ]
 
 export const styleRelations: StyleRelation[] = [
   { id: 'ambient-parent-newage', sourceId: 'ambient', targetId: 'newage', kind: 'parent_of' },
   { id: 'ambient-parent-darkambient', sourceId: 'ambient', targetId: 'darkambient', kind: 'parent_of' },
   { id: 'ambient-parent-spaceambient', sourceId: 'ambient', targetId: 'spaceambient', kind: 'parent_of' },
+  { id: 'ambient-parent-psybient', sourceId: 'ambient', targetId: 'psybient', kind: 'parent_of' },
 
   { id: 'electronic-parent-house', sourceId: 'electronic', targetId: 'house', kind: 'parent_of' },
   { id: 'electronic-parent-techno', sourceId: 'electronic', targetId: 'techno', kind: 'parent_of' },
@@ -102,7 +193,7 @@ export const styleRelations: StyleRelation[] = [
   { id: 'electronic-parent-ukgarage', sourceId: 'electronic', targetId: 'ukgarage', kind: 'parent_of' },
   { id: 'electronic-parent-breaks', sourceId: 'electronic', targetId: 'breaks', kind: 'parent_of' },
   { id: 'electronic-parent-drumandbass', sourceId: 'electronic', targetId: 'drumandbass', kind: 'parent_of' },
-  { id: 'electronic-parent-triphop', sourceId: 'electronic', targetId: 'triphop', kind: 'parent_of' },
+  { id: 'electronic-parent-downtempo', sourceId: 'electronic', targetId: 'downtempo', kind: 'parent_of' },
   { id: 'electronic-parent-chillout', sourceId: 'electronic', targetId: 'chillout', kind: 'parent_of' },
   { id: 'electronic-parent-lounge', sourceId: 'electronic', targetId: 'lounge', kind: 'parent_of' },
 
@@ -111,11 +202,57 @@ export const styleRelations: StyleRelation[] = [
   { id: 'rock-parent-indierock', sourceId: 'rock', targetId: 'indierock', kind: 'parent_of' },
   { id: 'rock-parent-postrock', sourceId: 'rock', targetId: 'postrock', kind: 'parent_of' },
 
+  { id: 'pop-parent-synthpop', sourceId: 'pop', targetId: 'synthpop', kind: 'parent_of' },
+  { id: 'pop-parent-indiepop', sourceId: 'pop', targetId: 'indiepop', kind: 'parent_of' },
+  { id: 'pop-parent-dancepop', sourceId: 'pop', targetId: 'dancepop', kind: 'parent_of' },
+  { id: 'indiepop-parent-dreampop', sourceId: 'indiepop', targetId: 'dreampop', kind: 'parent_of' },
+
+  { id: 'hiphop-parent-instrumentalhiphop', sourceId: 'hiphop', targetId: 'instrumentalhiphop', kind: 'parent_of' },
+  { id: 'hiphop-parent-trap', sourceId: 'hiphop', targetId: 'trap', kind: 'parent_of' },
+  { id: 'hiphop-parent-boombap', sourceId: 'hiphop', targetId: 'boombap', kind: 'parent_of' },
+  { id: 'instrumentalhiphop-parent-lofihiphop', sourceId: 'instrumentalhiphop', targetId: 'lofihiphop', kind: 'parent_of' },
+
+  { id: 'rnbsoulfunk-parent-rnb', sourceId: 'rnbsoulfunk', targetId: 'rnb', kind: 'parent_of' },
+  { id: 'rnbsoulfunk-parent-neosoul', sourceId: 'rnbsoulfunk', targetId: 'neosoul', kind: 'parent_of' },
+  { id: 'rnbsoulfunk-parent-funk', sourceId: 'rnbsoulfunk', targetId: 'funk', kind: 'parent_of' },
+  { id: 'rnbsoulfunk-parent-soul', sourceId: 'rnbsoulfunk', targetId: 'soul', kind: 'parent_of' },
+
   { id: 'jazz-parent-smoothjazz', sourceId: 'jazz', targetId: 'smoothjazz', kind: 'parent_of' },
   { id: 'jazz-parent-nujazz', sourceId: 'jazz', targetId: 'nujazz', kind: 'parent_of' },
-  { id: 'jazz-parent-bossanova', sourceId: 'jazz', targetId: 'bossanova', kind: 'parent_of' },
+  { id: 'jazz-parent-latinjazz', sourceId: 'jazz', targetId: 'latinjazz', kind: 'parent_of' },
+
   { id: 'classical-parent-piano', sourceId: 'classical', targetId: 'piano', kind: 'parent_of' },
-  { id: 'classical-parent-baroqueopera', sourceId: 'classical', targetId: 'baroqueopera', kind: 'parent_of' },
+  { id: 'classical-parent-opera', sourceId: 'classical', targetId: 'opera', kind: 'parent_of' },
+  { id: 'classical-parent-baroque', sourceId: 'classical', targetId: 'baroque', kind: 'parent_of' },
+
+  { id: 'metal-parent-heavymetal', sourceId: 'metal', targetId: 'heavymetal', kind: 'parent_of' },
+  { id: 'metal-parent-doommetal', sourceId: 'metal', targetId: 'doommetal', kind: 'parent_of' },
+  { id: 'metal-parent-blackmetal', sourceId: 'metal', targetId: 'blackmetal', kind: 'parent_of' },
+
+  { id: 'punkhardcore-parent-punk', sourceId: 'punkhardcore', targetId: 'punk', kind: 'parent_of' },
+  { id: 'punkhardcore-parent-postpunk', sourceId: 'punkhardcore', targetId: 'postpunk', kind: 'parent_of' },
+  { id: 'punkhardcore-parent-hardcore', sourceId: 'punkhardcore', targetId: 'hardcore', kind: 'parent_of' },
+
+  { id: 'folkcountryworld-parent-folk', sourceId: 'folkcountryworld', targetId: 'folk', kind: 'parent_of' },
+  { id: 'folkcountryworld-parent-country', sourceId: 'folkcountryworld', targetId: 'country', kind: 'parent_of' },
+  { id: 'folkcountryworld-parent-world', sourceId: 'folkcountryworld', targetId: 'world', kind: 'parent_of' },
+
+  { id: 'latin-parent-samba', sourceId: 'latin', targetId: 'samba', kind: 'parent_of' },
+  { id: 'latin-parent-bossanova', sourceId: 'latin', targetId: 'bossanova', kind: 'parent_of' },
+
+  { id: 'reggaeskadub-parent-reggae', sourceId: 'reggaeskadub', targetId: 'reggae', kind: 'parent_of' },
+  { id: 'reggaeskadub-parent-dub', sourceId: 'reggaeskadub', targetId: 'dub', kind: 'parent_of' },
+  { id: 'reggaeskadub-parent-ska', sourceId: 'reggaeskadub', targetId: 'ska', kind: 'parent_of' },
+
+  { id: 'blues-parent-electricblues', sourceId: 'blues', targetId: 'electricblues', kind: 'parent_of' },
+  { id: 'blues-parent-bluesrock', sourceId: 'blues', targetId: 'bluesrock', kind: 'parent_of' },
+
+  { id: 'soundtrackstage-parent-soundtrack', sourceId: 'soundtrackstage', targetId: 'soundtrack', kind: 'parent_of' },
+  { id: 'soundtrackstage-parent-musical', sourceId: 'soundtrackstage', targetId: 'musical', kind: 'parent_of' },
+
+  { id: 'experimentalnoise-parent-industrial', sourceId: 'experimentalnoise', targetId: 'industrial', kind: 'parent_of' },
+  { id: 'experimentalnoise-parent-noise', sourceId: 'experimentalnoise', targetId: 'noise', kind: 'parent_of' },
+  { id: 'experimentalnoise-parent-drone', sourceId: 'experimentalnoise', targetId: 'drone', kind: 'parent_of' },
 
   { id: 'house-parent-deephouse', sourceId: 'house', targetId: 'deephouse', kind: 'parent_of' },
   { id: 'house-parent-proghouse', sourceId: 'house', targetId: 'proghouse', kind: 'parent_of' },
@@ -125,19 +262,15 @@ export const styleRelations: StyleRelation[] = [
   { id: 'ukgarage-parent-futuregarage', sourceId: 'ukgarage', targetId: 'futuregarage', kind: 'parent_of' },
   { id: 'ukgarage-parent-dubstep', sourceId: 'ukgarage', targetId: 'dubstep', kind: 'parent_of' },
   { id: 'drumandbass-parent-liquidfunk', sourceId: 'drumandbass', targetId: 'liquidfunk', kind: 'parent_of' },
-  { id: 'chillout-parent-downtempo', sourceId: 'chillout', targetId: 'downtempo', kind: 'parent_of' },
+  { id: 'downtempo-parent-triphop', sourceId: 'downtempo', targetId: 'triphop', kind: 'parent_of' },
   { id: 'chillout-parent-vocalchillout', sourceId: 'chillout', targetId: 'vocalchillout', kind: 'parent_of' },
-  { id: 'chillout-parent-psybient', sourceId: 'chillout', targetId: 'psybient', kind: 'parent_of' },
-  { id: 'chillout-parent-lofi', sourceId: 'chillout', targetId: 'lofi', kind: 'parent_of' },
-
+  { id: 'chillout-parent-lofichill', sourceId: 'chillout', targetId: 'lofichill', kind: 'parent_of' },
   { id: 'indierock-parent-shoegaze', sourceId: 'indierock', targetId: 'shoegaze', kind: 'parent_of' },
-  { id: 'alternativerock-parent-dreampop', sourceId: 'alternativerock', targetId: 'dreampop', kind: 'parent_of' },
   { id: 'hardrock-parent-arenarock', sourceId: 'hardrock', targetId: 'arenarock', kind: 'parent_of' },
-
   { id: 'smoothjazz-parent-contemjazz', sourceId: 'smoothjazz', targetId: 'contemjazz', kind: 'parent_of' },
   { id: 'nujazz-parent-acidjazz', sourceId: 'nujazz', targetId: 'acidjazz', kind: 'parent_of' },
   { id: 'nujazz-parent-neosouljazz', sourceId: 'nujazz', targetId: 'neosouljazz', kind: 'parent_of' },
-  { id: 'bossanova-parent-cafejazz', sourceId: 'bossanova', targetId: 'cafejazz', kind: 'parent_of' },
+  { id: 'smoothjazz-parent-cafejazz', sourceId: 'smoothjazz', targetId: 'cafejazz', kind: 'parent_of' },
 
   { id: 'ambient-related-newage', sourceId: 'ambient', targetId: 'newage', kind: 'related_to' },
   { id: 'spaceambient-influenced-psybient', sourceId: 'spaceambient', targetId: 'psybient', kind: 'influenced_by' },
@@ -150,7 +283,9 @@ export const styleRelations: StyleRelation[] = [
   { id: 'triphop-fusion-nujazz', sourceId: 'triphop', targetId: 'nujazz', kind: 'fusion_of' },
   { id: 'chillout-related-downtempo', sourceId: 'chillout', targetId: 'downtempo', kind: 'related_to' },
   { id: 'dreampop-related-shoegaze', sourceId: 'dreampop', targetId: 'shoegaze', kind: 'related_to' },
-  { id: 'bossanova-influenced-smoothjazz', sourceId: 'bossanova', targetId: 'smoothjazz', kind: 'influenced_by' },
+  { id: 'bossanova-influenced-jazz', sourceId: 'bossanova', targetId: 'jazz', kind: 'influenced_by' },
+  { id: 'bossanova-fusion-latinjazz', sourceId: 'bossanova', targetId: 'latinjazz', kind: 'fusion_of' },
+  { id: 'lofihiphop-influenced-downtempo', sourceId: 'lofihiphop', targetId: 'downtempo', kind: 'influenced_by' },
 ]
 
 export const stationBindings: StationBinding[] = [
@@ -160,7 +295,8 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://ice1.somafm.com/dronezone-128-aac',
     countryLabel: 'US',
     bitrateLabel: '128k',
-    styleIds: ['ambient', 'darkambient'],
+    primaryStyleId: 'darkambient',
+    secondaryStyleIds: ['ambient'],
   },
   {
     id: 'deep-space-one',
@@ -168,7 +304,8 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://ice1.somafm.com/deepspaceone-128-aac',
     countryLabel: 'US',
     bitrateLabel: '128k',
-    styleIds: ['ambient', 'spaceambient', 'psybient'],
+    primaryStyleId: 'spaceambient',
+    secondaryStyleIds: ['ambient', 'psybient'],
   },
   {
     id: 'space-station',
@@ -176,7 +313,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://ice1.somafm.com/spacestation-128-aac',
     countryLabel: 'US',
     bitrateLabel: '128k',
-    styleIds: ['spaceambient'],
+    primaryStyleId: 'spaceambient',
   },
   {
     id: 'new-age-radiopotok',
@@ -184,7 +321,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://ic1.radiosignal.one/r8-mp3',
     countryLabel: 'RU',
     bitrateLabel: '192k',
-    styleIds: ['newage'],
+    primaryStyleId: 'newage',
   },
   {
     id: 'new-age-radioheart',
@@ -192,7 +329,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://a7.radioheart.ru:9044/newageradio',
     countryLabel: 'RU',
     bitrateLabel: '128k',
-    styleIds: ['newage'],
+    primaryStyleId: 'newage',
   },
   {
     id: 'record-ambient',
@@ -200,7 +337,8 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://radiorecord.hostingradio.ru/ambient96.aacp',
     countryLabel: 'RU',
     bitrateLabel: '96k',
-    styleIds: ['ambient', 'darkambient'],
+    primaryStyleId: 'ambient',
+    secondaryStyleIds: ['darkambient'],
   },
   {
     id: 'mission-control',
@@ -208,7 +346,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://ice1.somafm.com/missioncontrol-128-aac',
     countryLabel: 'US',
     bitrateLabel: '128k',
-    styleIds: ['spaceambient'],
+    primaryStyleId: 'spaceambient',
   },
   {
     id: 'groove-salad',
@@ -216,7 +354,9 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://ice1.somafm.com/groovesalad-128-aac',
     countryLabel: 'US',
     bitrateLabel: '128k',
-    styleIds: ['chillout', 'downtempo', 'triphop'],
+    primaryStyleId: 'downtempo',
+    secondaryStyleIds: ['triphop'],
+    descriptorIds: ['chillout'],
   },
   {
     id: 'lush',
@@ -224,7 +364,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://ice1.somafm.com/lush-128-aac',
     countryLabel: 'US',
     bitrateLabel: '128k',
-    styleIds: ['dreampop'],
+    primaryStyleId: 'dreampop',
   },
   {
     id: 'house-station-live',
@@ -232,7 +372,8 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://c2.radioboss.fm:8224/320k.mp3',
     countryLabel: 'US',
     bitrateLabel: '320k',
-    styleIds: ['electronic', 'house', 'proghouse'],
+    primaryStyleId: 'proghouse',
+    secondaryStyleIds: ['house', 'electronic'],
   },
   {
     id: 'beat-blender',
@@ -240,7 +381,9 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://ice1.somafm.com/beatblender-128-aac',
     countryLabel: 'US',
     bitrateLabel: '128k',
-    styleIds: ['electronic', 'chillout', 'downtempo'],
+    primaryStyleId: 'downtempo',
+    secondaryStyleIds: ['electronic'],
+    descriptorIds: ['chillout'],
   },
   {
     id: 'record-chillout',
@@ -248,7 +391,8 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://radiorecord.hostingradio.ru/chil96.aacp',
     countryLabel: 'RU',
     bitrateLabel: '96k',
-    styleIds: ['chillout'],
+    primaryStyleId: 'downtempo',
+    descriptorIds: ['chillout'],
   },
   {
     id: 'record-dubstep',
@@ -256,7 +400,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://radiorecord.hostingradio.ru/dub96.aacp',
     countryLabel: 'RU',
     bitrateLabel: '96k',
-    styleIds: ['dubstep'],
+    primaryStyleId: 'dubstep',
   },
   {
     id: 'ural-sound',
@@ -264,7 +408,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://5.restream.one/1392_1',
     countryLabel: 'RU',
     bitrateLabel: '128k',
-    styleIds: ['deephouse'],
+    primaryStyleId: 'deephouse',
   },
   {
     id: 'deep-one',
@@ -272,7 +416,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://stream.deep1.ru/deep1mp3',
     countryLabel: 'RU',
     bitrateLabel: '128k',
-    styleIds: ['deephouse'],
+    primaryStyleId: 'deephouse',
   },
   {
     id: 'soundpark-deep',
@@ -280,7 +424,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://h.getradio.me/spdeep/hls.m3u8',
     countryLabel: 'RU',
     bitrateLabel: 'HLS',
-    styleIds: ['deephouse'],
+    primaryStyleId: 'deephouse',
   },
   {
     id: 'techno-fm',
@@ -288,7 +432,8 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://stream.techno.fm/radio1-320k.mp3',
     countryLabel: 'US',
     bitrateLabel: '320k',
-    styleIds: ['techno', 'minimaltech', 'industrialtech'],
+    primaryStyleId: 'techno',
+    secondaryStyleIds: ['minimaltech', 'industrialtech'],
   },
   {
     id: 'puls-radio-trance',
@@ -296,7 +441,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://icecast.pulsradio.com/pulstranceHD.mp3',
     countryLabel: 'FR',
     bitrateLabel: '192k',
-    styleIds: ['trance'],
+    primaryStyleId: 'trance',
   },
   {
     id: 'anima-amoris-trance',
@@ -304,7 +449,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://amoris.sknt.ru/trance',
     countryLabel: 'RU',
     bitrateLabel: '160k',
-    styleIds: ['trance'],
+    primaryStyleId: 'trance',
   },
   {
     id: '90s-eurodance',
@@ -312,7 +457,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'http://listen1.myradio24.com:9000/5967',
     countryLabel: 'RU',
     bitrateLabel: '192k',
-    styleIds: ['eurodance'],
+    primaryStyleId: 'eurodance',
   },
   {
     id: 'ffh-eurodance',
@@ -320,7 +465,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://mp3.ffh.de/ffhchannels/hqeurodance.mp3',
     countryLabel: 'DE',
     bitrateLabel: '128k',
-    styleIds: ['eurodance'],
+    primaryStyleId: 'eurodance',
   },
   {
     id: 'tropical-house-nrg',
@@ -328,7 +473,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://pub0101.101.ru/stream/pro/aac/64/364',
     countryLabel: 'RU',
     bitrateLabel: '64k',
-    styleIds: ['tropicalhouse'],
+    primaryStyleId: 'tropicalhouse',
   },
   {
     id: 'tropical-house-sunshine-live',
@@ -336,7 +481,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://stream.sunshine-live.de/tropicalhouse/mp3-192/homepage/',
     countryLabel: 'DE',
     bitrateLabel: '192k',
-    styleIds: ['tropicalhouse'],
+    primaryStyleId: 'tropicalhouse',
   },
   {
     id: 'hearme-future-garage',
@@ -344,7 +489,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://radio.hearme.fm:8324/stream',
     countryLabel: 'UK',
     bitrateLabel: 'MP3',
-    styleIds: ['futuregarage'],
+    primaryStyleId: 'futuregarage',
   },
   {
     id: 'atmfm-breaks',
@@ -352,7 +497,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'http://station-sound.ru:8000/pt-2',
     countryLabel: 'RU',
     bitrateLabel: '128k',
-    styleIds: ['breaks'],
+    primaryStyleId: 'breaks',
   },
   {
     id: 'bassdrive',
@@ -360,7 +505,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'http://ice.bassdrive.net:80/stream',
     countryLabel: 'UK',
     bitrateLabel: '128k',
-    styleIds: ['drumandbass'],
+    primaryStyleId: 'drumandbass',
   },
   {
     id: 'liquid-dnb-station',
@@ -368,7 +513,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'http://95.47.244.172:8000/live',
     countryLabel: 'UA',
     bitrateLabel: 'MP3',
-    styleIds: ['liquidfunk'],
+    primaryStyleId: 'liquidfunk',
   },
   {
     id: 'radio-art-vocal-lounge',
@@ -376,7 +521,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://live.radioart.com/fVocal_lounge.mp3',
     countryLabel: 'US',
     bitrateLabel: '128k',
-    styleIds: ['lounge'],
+    primaryStyleId: 'lounge',
   },
   {
     id: 'radio-art-vocal-chillout',
@@ -384,7 +529,8 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://live.radioart.com/fVocal_chillout.mp3',
     countryLabel: 'US',
     bitrateLabel: '128k',
-    styleIds: ['vocalchillout'],
+    primaryStyleId: 'downtempo',
+    descriptorIds: ['vocalchillout'],
   },
   {
     id: 'hearme-vocal-chillout',
@@ -392,7 +538,8 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://radio.hearme.fm:8106/stream',
     countryLabel: 'UK',
     bitrateLabel: 'MP3',
-    styleIds: ['vocalchillout'],
+    primaryStyleId: 'downtempo',
+    descriptorIds: ['vocalchillout'],
   },
   {
     id: 'symphony-fm',
@@ -400,7 +547,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://radiorecord.hostingradio.ru/symph96.aacp',
     countryLabel: 'RU',
     bitrateLabel: '96k',
-    styleIds: ['classical'],
+    primaryStyleId: 'classical',
   },
   {
     id: 'orfey',
@@ -408,7 +555,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://orfeyfm.hostingradio.ru:8034/orfeyfm128.mp3',
     countryLabel: 'RU',
     bitrateLabel: '128k',
-    styleIds: ['classical'],
+    primaryStyleId: 'classical',
   },
   {
     id: 'indie-pop-rocks',
@@ -416,7 +563,8 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://ice1.somafm.com/indiepop-128-aac',
     countryLabel: 'US',
     bitrateLabel: '128k',
-    styleIds: ['indierock', 'dreampop'],
+    primaryStyleId: 'indiepop',
+    secondaryStyleIds: ['dreampop'],
   },
   {
     id: 'digitalis',
@@ -424,7 +572,8 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://ice1.somafm.com/digitalis-128-aac',
     countryLabel: 'US',
     bitrateLabel: '128k',
-    styleIds: ['rock', 'alternativerock', 'indierock'],
+    primaryStyleId: 'alternativerock',
+    secondaryStyleIds: ['rock', 'indierock'],
   },
   {
     id: 'n5md-radio',
@@ -432,7 +581,8 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://ice1.somafm.com/n5md-128-aac',
     countryLabel: 'US',
     bitrateLabel: '128k',
-    styleIds: ['postrock', 'shoegaze'],
+    primaryStyleId: 'postrock',
+    secondaryStyleIds: ['shoegaze'],
   },
   {
     id: 'underground-80s',
@@ -440,7 +590,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://ice1.somafm.com/u80s-128-aac',
     countryLabel: 'US',
     bitrateLabel: '128k',
-    styleIds: ['alternativerock'],
+    primaryStyleId: 'alternativerock',
   },
   {
     id: 'sonic-universe',
@@ -448,7 +598,8 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://ice1.somafm.com/sonicuniverse-128-aac',
     countryLabel: 'US',
     bitrateLabel: '128k',
-    styleIds: ['jazz', 'nujazz', 'neosouljazz'],
+    primaryStyleId: 'nujazz',
+    secondaryStyleIds: ['jazz', 'neosouljazz'],
   },
   {
     id: 'smooth-jazz-global',
@@ -456,7 +607,8 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://smoothjazz.cdnstream1.com/2585_128.mp3',
     countryLabel: 'US',
     bitrateLabel: '128k',
-    styleIds: ['smoothjazz', 'contemjazz'],
+    primaryStyleId: 'smoothjazz',
+    secondaryStyleIds: ['contemjazz'],
   },
   {
     id: 'smooth-jazz-r668',
@@ -464,7 +616,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://smoothjazz.cdnstream1.com/2585_128.mp3',
     countryLabel: 'US',
     bitrateLabel: '128k',
-    styleIds: ['smoothjazz'],
+    primaryStyleId: 'smoothjazz',
   },
   {
     id: 'smooth-lounge',
@@ -472,7 +624,8 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://smoothjazz.cdnstream1.com/2586_128.mp3',
     countryLabel: 'US',
     bitrateLabel: '128k',
-    styleIds: ['acidjazz', 'cafejazz'],
+    primaryStyleId: 'acidjazz',
+    descriptorIds: ['cafejazz'],
   },
   {
     id: 'bossa',
@@ -480,6 +633,7 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://ice1.somafm.com/bossa-128-aac',
     countryLabel: 'US',
     bitrateLabel: '128k',
-    styleIds: ['bossanova', 'cafejazz'],
+    primaryStyleId: 'bossanova',
+    descriptorIds: ['cafejazz'],
   },
 ]

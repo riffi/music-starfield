@@ -3,12 +3,14 @@ import Hls from 'hls.js'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { atlasData } from './data/atlas'
+import { getStationStyleLabels, stationMatchesNode } from './data/selectors'
 
 type RefNode = {
   id: string
   name: string
   level: 1 | 2 | 3
   parent: string | null
+  color: string
   stations: {
     name: string
     url: string
@@ -28,14 +30,6 @@ type RefLink = {
   source: string | RefNode
   target: string | RefNode
 }
-
-const COLORS = {
-  ambient: '#d4a853',
-  electronic: '#5a90d4',
-  rock: '#c94848',
-  jazz: '#9c5ad4',
-  classical: '#7fd1c8',
-} as const
 
 const TAU = Math.PI * 2
 
@@ -164,8 +158,9 @@ function App() {
       name: node.name,
       level: node.level,
       parent: node.parentId ?? null,
+      color: node.color,
       stations: atlasData.stations
-        .filter((station) => station.styleIds.includes(node.id))
+        .filter((station) => stationMatchesNode(station, node.id))
         .map((station) => ({
           name: station.name,
           url: station.streamUrl,
@@ -461,15 +456,34 @@ function App() {
     const expanded = new Set<string>()
 
     function getL1(node: RefNode) {
-      if (node.level === 1) return node.id
-      if (node.level === 2) return node.parent
-      if (node.level === 3) return node.parent ? nodeMap[node.parent]?.parent ?? null : null
+      if (node.level === 1) return node
+      if (node.level === 2) return node.parent ? nodeMap[node.parent] ?? null : null
+      if (node.level === 3) return node.parent ? nodeMap[nodeMap[node.parent]?.parent ?? ''] ?? null : null
       return null
     }
 
+    function clampSectorSpan(rootCount: number) {
+      const naturalStep = TAU / Math.max(rootCount, 1)
+      return Math.min(1.46, naturalStep * 0.82)
+    }
+
+    function distributeOffset(index: number, total: number) {
+      if (total <= 1) return 0
+      return (index / (total - 1) - 0.5) * 2
+    }
+
     function nodeColor(node: RefNode) {
-      const key = getL1(node) as keyof typeof COLORS | null
-      return key ? COLORS[key] : COLORS.ambient
+      return getL1(node)?.color ?? node.color
+    }
+
+    function nodeBelongsToRoot(node: RefNode, rootId: string) {
+      return getL1(node)?.id === rootId
+    }
+
+    function getActiveRootId() {
+      const expandedRoots = rootNodes.filter((root) => expanded.has(root.id))
+      if (expandedRoots.length === 1) return expandedRoots[0].id
+      return null
     }
 
     function nr(node: RefNode) {
@@ -502,7 +516,8 @@ function App() {
       const visibleIds = new Set(visibleNodes.map((node) => node.id))
       const centerX = width() / 2
       const centerY = height() / 2
-      const rootOrbit = Math.max(160, Math.min(width(), height()) * 0.3)
+      const rootOrbit = Math.max(210, Math.min(width(), height()) * 0.34)
+      const sectorSpan = clampSectorSpan(rootNodes.length)
 
       rootNodes.forEach((root, rootIndex) => {
         const rootAngle = -Math.PI / 2 + (rootIndex / Math.max(rootNodes.length, 1)) * TAU
@@ -512,25 +527,36 @@ function App() {
 
         const level2Children = (childrenByParent[root.id] ?? []).filter((child) => visibleIds.has(child.id))
         const visibleGrandchildren = level2Children.reduce((sum, child) => sum + ((childrenByParent[child.id] ?? []).filter((grandchild) => visibleIds.has(grandchild.id)).length), 0)
-        const level2Orbit = 132 + Math.max(0, level2Children.length - 5) * 16 + visibleGrandchildren * 6
+        const level2Orbit = 144 + Math.max(0, level2Children.length - 5) * 14 + visibleGrandchildren * 5
+        const rootDirX = Math.cos(rootAngle)
+        const rootDirY = Math.sin(rootAngle)
+        const rootTanX = Math.cos(rootAngle + Math.PI / 2)
+        const rootTanY = Math.sin(rootAngle + Math.PI / 2)
+        const level2TangentLimit = Math.tan(sectorSpan / 2) * level2Orbit * 0.94
 
         level2Children.forEach((child, childIndex) => {
-          const childAngle = -Math.PI / 2 + (childIndex / Math.max(level2Children.length, 1)) * TAU
-          const childX = rootX + Math.cos(childAngle) * level2Orbit
-          const childY = rootY + Math.sin(childAngle) * level2Orbit
+          const level2Offset = distributeOffset(childIndex, level2Children.length)
+          const tangentSpread = level2TangentLimit * level2Offset
+          const childX = rootX + rootDirX * level2Orbit + rootTanX * tangentSpread
+          const childY = rootY + rootDirY * level2Orbit + rootTanY * tangentSpread
           targets.set(child.id, { x: childX, y: childY })
 
           const level3Children = (childrenByParent[child.id] ?? []).filter((grandchild) => visibleIds.has(grandchild.id))
-          const level3Orbit = 94 + Math.max(0, level3Children.length - 2) * 18 + Math.max(0, level2Children.length - 6) * 6
+          const level3Orbit = 102 + Math.max(0, level3Children.length - 2) * 12 + Math.max(0, level2Children.length - 6) * 4
           const branchAngle = Math.atan2(childY - rootY, childX - rootX)
-          const arc = level3Children.length <= 1 ? 0 : Math.min(1.7, 0.45 + level3Children.length * 0.26)
+          const branchDirX = Math.cos(branchAngle)
+          const branchDirY = Math.sin(branchAngle)
+          const branchTanX = Math.cos(branchAngle + Math.PI / 2)
+          const branchTanY = Math.sin(branchAngle + Math.PI / 2)
+          const level3Span = Math.min(1.08, sectorSpan * 0.84)
+          const level3TangentLimit = Math.tan(level3Span / 2) * level3Orbit * 0.94
 
           level3Children.forEach((grandchild, grandchildIndex) => {
-            const offset = level3Children.length <= 1 ? 0 : (grandchildIndex / (level3Children.length - 1) - 0.5) * arc
-            const grandchildAngle = branchAngle + offset
+            const offset = distributeOffset(grandchildIndex, level3Children.length)
+            const branchSpread = level3TangentLimit * offset
             targets.set(grandchild.id, {
-              x: childX + Math.cos(grandchildAngle) * level3Orbit,
-              y: childY + Math.sin(grandchildAngle) * level3Orbit,
+              x: childX + branchDirX * level3Orbit + branchTanX * branchSpread,
+              y: childY + branchDirY * level3Orbit + branchTanY * branchSpread,
             })
           })
         })
@@ -541,6 +567,7 @@ function App() {
 
     const simulation = d3
       .forceSimulation<RefNode>()
+      .velocityDecay(0.42)
       .force(
         'link',
         d3
@@ -561,11 +588,11 @@ function App() {
           })
           .strength((d) => {
             const source = typeof d.source === 'object' ? d.source : nodeMap[d.source]
-            return source?.level === 2 ? 0.95 : 0.72
+            return source?.level === 2 ? 1.08 : 0.9
           }),
       )
-      .force('charge', d3.forceManyBody<RefNode>().strength((d) => (d.level === 1 ? -420 : d.level === 2 ? -220 : -140)))
-      .force('collision', d3.forceCollide<RefNode>().radius((d) => nr(d) + (d.level === 1 ? 34 : d.level === 2 ? 30 : 26)))
+      .force('charge', d3.forceManyBody<RefNode>().strength((d) => (d.level === 1 ? -320 : d.level === 2 ? -90 : -48)))
+      .force('collision', d3.forceCollide<RefNode>().radius((d) => nr(d) + (d.level === 1 ? 34 : d.level === 2 ? 22 : 16)))
       .force('center', d3.forceCenter())
 
     simulation.on('tick', () => {
@@ -610,11 +637,21 @@ function App() {
       nodes.filter((node) => node.parent === id).forEach((node) => collapseAll(node.id))
     }
 
+    function collapseOtherRoots(activeRootId: string) {
+      rootNodes.forEach((root) => {
+        if (root.id !== activeRootId) collapseAll(root.id)
+      })
+    }
+
     function clickNode(node: RefNode) {
       const hasKids = nodes.some((item) => item.parent === node.id)
       if (hasKids) {
         if (expanded.has(node.id)) collapseAll(node.id)
-        else expanded.add(node.id)
+        else {
+          const rootId = getL1(node)?.id
+          if (rootId) collapseOtherRoots(rootId)
+          expanded.add(node.id)
+        }
         update(false)
       }
       highlight(node.id)
@@ -624,26 +661,28 @@ function App() {
     function update(initial: boolean) {
       const { visibleNodes, visibleLinks } = getVisible()
       const targets = computeTargets(visibleNodes)
+      const activeRootId = getActiveRootId()
       simulation.force('center', d3.forceCenter(width() / 2, height() / 2))
       simulation.force(
         'orbit-x',
         d3
           .forceX<RefNode>((d) => targets.get(d.id)?.x ?? width() / 2)
-          .strength((d) => (d.level === 1 ? 0.22 : d.level === 2 ? 0.2 : 0.34)),
+          .strength((d) => (d.level === 1 ? 0.3 : d.level === 2 ? 0.72 : 0.84)),
       )
       simulation.force(
         'orbit-y',
         d3
           .forceY<RefNode>((d) => targets.get(d.id)?.y ?? height() / 2)
-          .strength((d) => (d.level === 1 ? 0.22 : d.level === 2 ? 0.2 : 0.34)),
+          .strength((d) => (d.level === 1 ? 0.3 : d.level === 2 ? 0.72 : 0.84)),
       )
 
       visibleNodes.forEach((node) => {
         const target = targets.get(node.id)
         if (!target) return
         if (node.x === undefined || node.y === undefined || initial) {
-          node.x = target.x + (Math.random() - 0.5) * 28
-          node.y = target.y + (Math.random() - 0.5) * 28
+          const jitter = node.level === 1 ? 18 : node.level === 2 ? 10 : 6
+          node.x = target.x + (Math.random() - 0.5) * jitter
+          node.y = target.y + (Math.random() - 0.5) * jitter
         }
       })
 
@@ -653,7 +692,7 @@ function App() {
         return `${source}>${target}`
       })
 
-      linkSelection
+      const enteredLinks = linkSelection
         .enter()
         .append('line')
         .attr('class', 'edge')
@@ -674,6 +713,8 @@ function App() {
         .transition()
         .duration(450)
         .style('opacity', 1)
+
+      const activeLinkSelection = linkSelection.merge(enteredLinks)
 
       linkSelection.exit().transition().duration(300).style('opacity', 0).remove()
 
@@ -796,9 +837,11 @@ function App() {
 
       entered.transition().duration(500).style('opacity', 1)
 
+      const activeNodeSelection = nodeSelection.merge(entered)
+
       const labelSelection = labelG.selectAll<SVGTextElement, RefNode>('text.lbl').data(visibleNodes, (d) => d.id)
 
-      labelSelection
+      const enteredLabels = labelSelection
         .enter()
         .append('text')
         .attr('class', 'lbl')
@@ -816,13 +859,61 @@ function App() {
         .duration(500)
         .style('opacity', 1)
 
+      const activeLabelSelection = labelSelection.merge(enteredLabels)
+
       labelSelection.exit().transition().duration(300).style('opacity', 0).remove()
       nodeSelection.exit().transition().duration(300).style('opacity', 0).remove()
+
+      activeNodeSelection
+        .transition()
+        .duration(420)
+        .style('opacity', (d) => {
+          if (!activeRootId) return 1
+          return nodeBelongsToRoot(d, activeRootId) ? 1 : d.level === 1 ? 0.34 : 0.12
+        })
+
+      activeLabelSelection
+        .transition()
+        .duration(420)
+        .style('opacity', (d) => {
+          if (!activeRootId) return 1
+          return nodeBelongsToRoot(d, activeRootId) ? 1 : d.level === 1 ? 0.42 : 0.14
+        })
+
+      activeLinkSelection
+        .transition()
+        .duration(420)
+        .style('opacity', (d) => {
+          if (!activeRootId) return 1
+          const source = typeof d.source === 'object' ? d.source : nodeMap[d.source]
+          const target = typeof d.target === 'object' ? d.target : nodeMap[d.target]
+          return nodeBelongsToRoot(source, activeRootId) && nodeBelongsToRoot(target, activeRootId) ? 1 : 0.1
+        })
 
       simulation.nodes(visibleNodes)
       const linkForce = simulation.force<d3.ForceLink<RefNode, RefLink>>('link')
       linkForce?.links(visibleLinks)
       simulation.alpha(initial ? 1 : 0.4).restart()
+
+      const focusTransform = (() => {
+        if (!activeRootId) {
+          return d3.zoomIdentity.translate(width() / 2, height() / 2).scale(1).translate(-width() / 2, -height() / 2)
+        }
+
+        const rootTarget = targets.get(activeRootId)
+        if (!rootTarget) {
+          return d3.zoomIdentity.translate(width() / 2, height() / 2).scale(1).translate(-width() / 2, -height() / 2)
+        }
+
+        const scale = 1.18
+        return d3.zoomIdentity.translate(width() / 2, height() / 2).scale(scale).translate(-rootTarget.x, -rootTarget.y)
+      })()
+
+      svg
+        .transition()
+        .duration(initial ? 100 : 700)
+        .ease(d3.easeCubicOut)
+        .call(zoomBehavior.transform, focusTransform)
     }
 
     const zoomBehavior = d3
@@ -879,7 +970,7 @@ function App() {
 
   const panelStations = useMemo(() => {
     if (!selectedNode) return []
-    return atlasData.stations.filter((station) => station.styleIds.includes(selectedNode.id))
+    return atlasData.stations.filter((station) => stationMatchesNode(station, selectedNode.id))
   }, [selectedNode])
 
   const realWavePath = useMemo(() => (waveformSamples ? buildWaveformPath(waveformSamples, 180, 28) : ''), [waveformSamples])
@@ -1036,11 +1127,12 @@ function App() {
           <div className="hdr-sub">A stellar cartography of music genres &amp; radio transmissions</div>
         </div>
         <div className="legend">
-          <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--ambient)', boxShadow: '0 0 6px var(--ambient)' }} /><span style={{ color: 'var(--text-dim)' }}>Ambient</span></div>
-          <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--electronic)', boxShadow: '0 0 6px var(--electronic)' }} /><span style={{ color: 'var(--text-dim)' }}>Electronic</span></div>
-          <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--rock)', boxShadow: '0 0 6px var(--rock)' }} /><span style={{ color: 'var(--text-dim)' }}>Rock</span></div>
-          <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--jazz)', boxShadow: '0 0 6px var(--jazz)' }} /><span style={{ color: 'var(--text-dim)' }}>Jazz</span></div>
-          <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--classical)', boxShadow: '0 0 6px var(--classical)' }} /><span style={{ color: 'var(--text-dim)' }}>Classical</span></div>
+          {atlasData.roots.map((root) => (
+            <div key={root.id} className="legend-item">
+              <div className="legend-dot" style={{ background: root.color, boxShadow: `0 0 6px ${root.color}` }} />
+              <span style={{ color: 'var(--text-dim)' }}>{root.name}</span>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -1066,9 +1158,15 @@ function App() {
               {panelStations.map((station) => {
                 const active = currentStationId === station.id
                 const loading = loadingStationId === station.id
+                const styleLabels = getStationStyleLabels(station)
                 return (
                   <div key={station.id} className={`s-card${active ? ' playing' : ''}`}>
                     <div className="s-name">{station.name}</div>
+                    <div className="s-taxonomy">
+                      <span className="s-taxonomy-row">Primary: {styleLabels.primary}</span>
+                      {styleLabels.related.length ? <span className="s-taxonomy-row">Related: {styleLabels.related.join(' • ')}</span> : null}
+                      {styleLabels.descriptors.length ? <span className="s-taxonomy-row">Descriptors: {styleLabels.descriptors.join(' • ')}</span> : null}
+                    </div>
                     <div className="s-meta">
                       <span className="s-country">{station.countryLabel === 'US' ? '🇺🇸 US' : station.countryLabel}</span>
                       <span className="s-br">{station.bitrateLabel}</span>
