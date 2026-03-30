@@ -48,6 +48,7 @@ export const styleTaxonomy: StyleTaxon[] = [
   { id: 'drumandbass', name: 'Drum & Bass', root: 'electronic', level: 2, parentId: 'electronic' },
   { id: 'triphop', name: 'Trip-Hop', root: 'electronic', level: 2, parentId: 'electronic' },
   { id: 'chillout', name: 'Chillout', root: 'electronic', level: 2, parentId: 'electronic' },
+  { id: 'lounge', name: 'Lounge', root: 'electronic', level: 2, parentId: 'electronic' },
 
   { id: 'hardrock', name: 'Hard Rock', root: 'rock', level: 2, parentId: 'rock' },
   { id: 'alternativerock', name: 'Alternative Rock', root: 'rock', level: 2, parentId: 'rock' },
@@ -62,7 +63,9 @@ export const styleTaxonomy: StyleTaxon[] = [
   { id: 'proghouse', name: 'Progressive House', root: 'electronic', level: 3, parentId: 'house' },
   { id: 'industrialtech', name: 'Industrial Techno', root: 'electronic', level: 3, parentId: 'techno' },
   { id: 'minimaltech', name: 'Minimal Techno', root: 'electronic', level: 3, parentId: 'techno' },
+  { id: 'liquidfunk', name: 'Liquid Funk', root: 'electronic', level: 3, parentId: 'drumandbass' },
   { id: 'downtempo', name: 'Downtempo', root: 'electronic', level: 3, parentId: 'chillout' },
+  { id: 'vocalchillout', name: 'Vocal Chillout', root: 'electronic', level: 3, parentId: 'chillout' },
   { id: 'psybient', name: 'Psybient', root: 'electronic', level: 3, parentId: 'chillout' },
   { id: 'lofi', name: 'Lo-Fi Chill', root: 'electronic', level: 3, parentId: 'chillout' },
 
@@ -86,6 +89,7 @@ export const styleRelations: StyleRelation[] = [
   { id: 'electronic-parent-drumandbass', sourceId: 'electronic', targetId: 'drumandbass', kind: 'parent_of' },
   { id: 'electronic-parent-triphop', sourceId: 'electronic', targetId: 'triphop', kind: 'parent_of' },
   { id: 'electronic-parent-chillout', sourceId: 'electronic', targetId: 'chillout', kind: 'parent_of' },
+  { id: 'electronic-parent-lounge', sourceId: 'electronic', targetId: 'lounge', kind: 'parent_of' },
 
   { id: 'rock-parent-hardrock', sourceId: 'rock', targetId: 'hardrock', kind: 'parent_of' },
   { id: 'rock-parent-alternativerock', sourceId: 'rock', targetId: 'alternativerock', kind: 'parent_of' },
@@ -100,7 +104,9 @@ export const styleRelations: StyleRelation[] = [
   { id: 'house-parent-proghouse', sourceId: 'house', targetId: 'proghouse', kind: 'parent_of' },
   { id: 'techno-parent-industrialtech', sourceId: 'techno', targetId: 'industrialtech', kind: 'parent_of' },
   { id: 'techno-parent-minimaltech', sourceId: 'techno', targetId: 'minimaltech', kind: 'parent_of' },
+  { id: 'drumandbass-parent-liquidfunk', sourceId: 'drumandbass', targetId: 'liquidfunk', kind: 'parent_of' },
   { id: 'chillout-parent-downtempo', sourceId: 'chillout', targetId: 'downtempo', kind: 'parent_of' },
+  { id: 'chillout-parent-vocalchillout', sourceId: 'chillout', targetId: 'vocalchillout', kind: 'parent_of' },
   { id: 'chillout-parent-psybient', sourceId: 'chillout', targetId: 'psybient', kind: 'parent_of' },
   { id: 'chillout-parent-lofi', sourceId: 'chillout', targetId: 'lofi', kind: 'parent_of' },
 
@@ -242,6 +248,30 @@ export const stationBindings: StationBinding[] = [
     countryLabel: 'UK',
     bitrateLabel: '128k',
     styleIds: ['drumandbass'],
+  },
+  {
+    id: 'liquid-dnb-station',
+    name: 'Liquid DnB Station',
+    streamUrl: 'http://95.47.244.172:8000/live',
+    countryLabel: 'UA',
+    bitrateLabel: 'MP3',
+    styleIds: ['liquidfunk'],
+  },
+  {
+    id: 'radio-art-vocal-lounge',
+    name: 'Radio Art - Vocal Lounge',
+    streamUrl: 'https://live.radioart.com/fVocal_lounge.mp3',
+    countryLabel: 'US',
+    bitrateLabel: '128k',
+    styleIds: ['lounge'],
+  },
+  {
+    id: 'radio-art-vocal-chillout',
+    name: 'Radio Art - Vocal Chillout',
+    streamUrl: 'https://live.radioart.com/fVocal_chillout.mp3',
+    countryLabel: 'US',
+    bitrateLabel: '128k',
+    styleIds: ['vocalchillout'],
   },
   {
     id: 'indie-pop-rocks',
