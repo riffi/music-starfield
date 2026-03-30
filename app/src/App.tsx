@@ -29,7 +29,7 @@ type RefLink = {
 }
 
 const COLORS = {
-  relax: '#d4a853',
+  ambient: '#d4a853',
   electronic: '#5a90d4',
   rock: '#c94848',
   jazz: '#9c5ad4',
@@ -282,7 +282,7 @@ function App() {
 
     function nodeColor(node: RefNode) {
       const key = getL1(node) as keyof typeof COLORS | null
-      return key ? COLORS[key] : COLORS.relax
+      return key ? COLORS[key] : COLORS.ambient
     }
 
     function nr(node: RefNode) {
@@ -681,7 +681,7 @@ function App() {
           <div className="hdr-sub">A stellar cartography of music genres &amp; radio transmissions</div>
         </div>
         <div className="legend">
-          <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--relax)', boxShadow: '0 0 6px var(--relax)' }} /><span style={{ color: 'var(--text-dim)' }}>Relax</span></div>
+          <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--ambient)', boxShadow: '0 0 6px var(--ambient)' }} /><span style={{ color: 'var(--text-dim)' }}>Ambient</span></div>
           <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--electronic)', boxShadow: '0 0 6px var(--electronic)' }} /><span style={{ color: 'var(--text-dim)' }}>Electronic</span></div>
           <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--rock)', boxShadow: '0 0 6px var(--rock)' }} /><span style={{ color: 'var(--text-dim)' }}>Rock</span></div>
           <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--jazz)', boxShadow: '0 0 6px var(--jazz)' }} /><span style={{ color: 'var(--text-dim)' }}>Jazz</span></div>
