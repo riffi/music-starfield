@@ -129,6 +129,9 @@ function App() {
   const analyserRef = useRef<AnalyserNode | null>(null)
   const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null)
   const waveformFrameRef = useRef<number | null>(null)
+  const pulseFrameRef = useRef<number | null>(null)
+  const stationPulseIdsRef = useRef<Set<string>>(new Set())
+  const audioDataRef = useRef({ bass: 0, energy: 0 })
   const viewportRef = useRef({ x: 0, y: 0, k: 1, focusX: 0, focusY: 0 })
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -182,7 +185,11 @@ function App() {
     let height = 0
     let stars: { x: number; y: number; r: number; op: number; spd: number; ph: number; col: string; depth: number; glow: number }[] = []
     let nebulae: { x: number; y: number; r: number; color: string; alpha: number; drift: number }[] = []
+    let milkyWayStars: { x: number; y: number; r: number; op: number; ph: number }[] = []
+    let shootingStars: { x: number; y: number; vx: number; vy: number; spd: number; len: number; alpha: number; col: string }[] = []
+    let nextShootAt = 0
     let t = 0
+    let freqData: Uint8Array | null = null
 
     function resize() {
       width = canvasEl.width = window.innerWidth
@@ -192,6 +199,9 @@ function App() {
     function init() {
       stars = []
       nebulae = []
+      milkyWayStars = []
+      shootingStars = []
+      nextShootAt = 4
 
       for (let i = 0; i < 6; i += 1) {
         nebulae.push({
@@ -201,6 +211,22 @@ function App() {
           color: Math.random() > 0.5 ? '70,110,210' : Math.random() > 0.5 ? '120,70,180' : '210,150,80',
           alpha: Math.random() * 0.07 + 0.03,
           drift: Math.random() * 0.15 + 0.05,
+        })
+      }
+
+      // Milky Way — diagonal band of dense faint stars
+      const mwAngle = -0.35
+      const mwCx = width * 0.5
+      const mwCy = height * 0.45
+      for (let i = 0; i < 400; i++) {
+        const along = (Math.random() - 0.5) * Math.sqrt(width * width + height * height) * 0.98
+        const perp = (Math.random() + Math.random() + Math.random() - 1.5) * height * 0.09
+        milkyWayStars.push({
+          x: mwCx + along * Math.cos(mwAngle) - perp * Math.sin(mwAngle),
+          y: mwCy + along * Math.sin(mwAngle) + perp * Math.cos(mwAngle),
+          r: Math.random() * 0.52 + 0.1,
+          op: Math.random() * 0.24 + 0.05,
+          ph: Math.random() * Math.PI * 2,
         })
       }
 
@@ -231,21 +257,83 @@ function App() {
       context.fillRect(0, 0, width, height)
       t += 0.008
 
+      // Sample Web Audio analyser (if music is playing)
+      let audioBass = 0
+      let audioEnergy = 0
+      const liveAnalyser = analyserRef.current
+      if (liveAnalyser) {
+        if (!freqData || freqData.length !== liveAnalyser.frequencyBinCount) {
+          freqData = new Uint8Array(liveAnalyser.frequencyBinCount)
+        }
+        liveAnalyser.getByteFrequencyData(freqData)
+        // Bass = weighted sum of first 3 bins (0–516 Hz)
+        audioBass = (freqData[0] * 0.55 + freqData[1] * 0.30 + freqData[2] * 0.15) / 255
+        let sum = 0
+        for (let fi = 0; fi < freqData.length; fi++) sum += freqData[fi]
+        audioEnergy = sum / (freqData.length * 255)
+        // Smooth the values to avoid jitter
+        audioDataRef.current = {
+          bass: audioDataRef.current.bass * 0.35 + audioBass * 0.65,
+          energy: audioDataRef.current.energy * 0.35 + audioEnergy * 0.65,
+        }
+      } else {
+        // Gentle decay when not playing
+        audioDataRef.current = {
+          bass: audioDataRef.current.bass * 0.94,
+          energy: audioDataRef.current.energy * 0.94,
+        }
+      }
+      audioBass = audioDataRef.current.bass
+      audioEnergy = audioDataRef.current.energy
+
+      // Milky Way — subtle diffuse band glow
+      const mwAngle = -0.35
+      const mwCx = width * 0.5
+      const mwCy = height * 0.45
+      const mwPerpX = Math.sin(mwAngle)
+      const mwPerpY = -Math.cos(mwAngle)
+      const mwHalf = height * 0.14
+      const mwGrad = context.createLinearGradient(
+        mwCx + mwPerpX * mwHalf, mwCy + mwPerpY * mwHalf,
+        mwCx - mwPerpX * mwHalf, mwCy - mwPerpY * mwHalf,
+      )
+      mwGrad.addColorStop(0, 'rgba(80,120,220,0)')
+      mwGrad.addColorStop(0.5, `rgba(110,150,255,${0.022 + Math.sin(t * 0.12) * 0.004})`)
+      mwGrad.addColorStop(1, 'rgba(80,120,220,0)')
+      context.fillStyle = mwGrad
+      context.fillRect(0, 0, width, height)
+
+      // Milky Way individual stars
+      for (const mws of milkyWayStars) {
+        const tw = Math.sin(t * 1.1 + mws.ph) * 0.5 + 0.5
+        context.beginPath()
+        context.arc(mws.x, mws.y, mws.r, 0, Math.PI * 2)
+        context.fillStyle = `rgba(190,210,255,${mws.op * (0.5 + 0.5 * tw)})`
+        context.fill()
+      }
+
       for (const nebula of nebulae) {
         const nx = nebula.x + viewportRef.current.x * nebula.drift * 0.02
         const ny = nebula.y + viewportRef.current.y * nebula.drift * 0.02
         const pulse = Math.sin(t * nebula.drift + nebula.x * 0.0015) * 0.5 + 0.5
-        const g = context.createRadialGradient(nx, ny, 0, nx, ny, nebula.r)
-        g.addColorStop(0, `rgba(${nebula.color},${nebula.alpha * (0.7 + pulse * 0.45)})`)
-        g.addColorStop(0.45, `rgba(${nebula.color},${nebula.alpha * 0.28})`)
+        // Bass expands the nebula radius; energy boosts its brightness
+        const audioR = nebula.r * (1 + audioBass * 0.55)
+        const audioAlpha = nebula.alpha * (0.7 + pulse * 0.45 + audioEnergy * 0.55)
+        const g = context.createRadialGradient(nx, ny, 0, nx, ny, audioR)
+        g.addColorStop(0, `rgba(${nebula.color},${Math.min(audioAlpha, 0.88)})`)
+        g.addColorStop(0.45, `rgba(${nebula.color},${nebula.alpha * (0.28 + audioEnergy * 0.14)})`)
         g.addColorStop(1, `rgba(${nebula.color},0)`)
         context.fillStyle = g
-        context.fillRect(nx - nebula.r, ny - nebula.r, nebula.r * 2, nebula.r * 2)
+        context.fillRect(nx - audioR, ny - audioR, audioR * 2, audioR * 2)
       }
 
       for (const star of stars) {
-        const tw = Math.sin(t * star.spd * 12 + star.ph) * 0.5 + 0.5
-        const opacity = star.op * (0.35 + 0.65 * tw)
+        // Primary twinkle: period 3–13 s (was 1.8–9 min with multiplier 12)
+        const tw = Math.sin(t * star.spd * 480 + star.ph) * 0.5 + 0.5
+        // Bright stars get a faint secondary shimmer at a slightly different rate
+        const tw2 = star.r > 1.1 ? Math.sin(t * star.spd * 310 + star.ph * 1.7) * 0.5 + 0.5 : tw
+        const twBlend = tw * 0.78 + tw2 * 0.22
+        const opacity = star.op * (0.22 + 0.78 * twBlend) * (1 + audioEnergy * 0.28)
         const depth = star.depth
         const viewportShiftX = viewportRef.current.x * depth * 0.025
         const viewportShiftY = viewportRef.current.y * depth * 0.025
@@ -257,17 +345,22 @@ function App() {
         const px = scaledX + viewportShiftX
         const py = scaledY + viewportShiftY
 
+        // Radius pulses gently for brighter stars (±13%)
+        const pr = star.r > 0.8 ? star.r * (0.87 + 0.13 * twBlend) : star.r
+
         if (star.glow > 0) {
-          const glow = context.createRadialGradient(px, py, 0, px, py, star.glow)
-          glow.addColorStop(0, `rgba(${star.col},${opacity * 0.22})`)
-          glow.addColorStop(0.35, `rgba(${star.col},${opacity * 0.08})`)
+          // Glow radius also breathes with the twinkle
+          const glowR = star.glow * (0.72 + 0.28 * twBlend)
+          const glow = context.createRadialGradient(px, py, 0, px, py, glowR)
+          glow.addColorStop(0, `rgba(${star.col},${opacity * 0.26})`)
+          glow.addColorStop(0.35, `rgba(${star.col},${opacity * 0.09})`)
           glow.addColorStop(1, `rgba(${star.col},0)`)
           context.fillStyle = glow
-          context.fillRect(px - star.glow, py - star.glow, star.glow * 2, star.glow * 2)
+          context.fillRect(px - glowR, py - glowR, glowR * 2, glowR * 2)
         }
 
         context.beginPath()
-        context.arc(px, py, star.r, 0, Math.PI * 2)
+        context.arc(px, py, pr, 0, Math.PI * 2)
         context.fillStyle = `rgba(${star.col},${opacity})`
         context.fill()
 
@@ -281,6 +374,61 @@ function App() {
           context.lineTo(px, py + star.r * 3)
           context.stroke()
         }
+      }
+
+      // Shooting stars — spawn one every 4–14 real seconds
+      if (shootingStars.length < 2 && t > nextShootAt) {
+        const fromTop = Math.random() > 0.42
+        const sx = fromTop ? Math.random() * width * 0.9 : Math.random() < 0.5 ? -10 : width + 10
+        const sy = fromTop ? -10 : Math.random() * height * 0.55
+        const angle = fromTop
+          ? Math.PI * 0.15 + Math.random() * 0.4
+          : sx < 0 ? Math.PI * 0.05 + Math.random() * 0.3 : Math.PI - Math.PI * 0.05 - Math.random() * 0.3
+        const spd = Math.random() * 9 + 7
+        shootingStars.push({
+          x: sx, y: sy,
+          vx: Math.cos(angle) * spd,
+          vy: Math.sin(angle) * spd,
+          spd,
+          len: Math.random() * 100 + 60,
+          alpha: 0.9,
+          col: Math.random() > 0.6 ? '255,242,200' : '210,228,255',
+        })
+        nextShootAt = t + Math.random() * 5 + 2
+      }
+
+      for (let si = shootingStars.length - 1; si >= 0; si--) {
+        const ss = shootingStars[si]
+        ss.x += ss.vx
+        ss.y += ss.vy
+        ss.alpha -= 0.0085
+
+        if (ss.alpha <= 0 || ss.x > width + 140 || ss.y > height + 140 || ss.x < -140) {
+          shootingStars.splice(si, 1)
+          continue
+        }
+
+        const invSpd = ss.spd > 0 ? 1 / ss.spd : 1
+        const tailX = ss.x - ss.vx * invSpd * ss.len
+        const tailY = ss.y - ss.vy * invSpd * ss.len
+        const ssGrad = context.createLinearGradient(tailX, tailY, ss.x, ss.y)
+        ssGrad.addColorStop(0, `rgba(${ss.col},0)`)
+        ssGrad.addColorStop(0.7, `rgba(${ss.col},${ss.alpha * 0.4})`)
+        ssGrad.addColorStop(1, `rgba(${ss.col},${ss.alpha})`)
+        context.beginPath()
+        context.moveTo(tailX, tailY)
+        context.lineTo(ss.x, ss.y)
+        context.strokeStyle = ssGrad
+        context.lineWidth = 1.6
+        context.stroke()
+        // bright head
+        const headGlow = context.createRadialGradient(ss.x, ss.y, 0, ss.x, ss.y, 5)
+        headGlow.addColorStop(0, `rgba(${ss.col},${ss.alpha})`)
+        headGlow.addColorStop(1, `rgba(${ss.col},0)`)
+        context.beginPath()
+        context.arc(ss.x, ss.y, 5, 0, Math.PI * 2)
+        context.fillStyle = headGlow
+        context.fill()
       }
 
       animationRef.current = requestAnimationFrame(draw)
@@ -317,6 +465,79 @@ function App() {
 
     animate()
     return () => cancelAnimationFrame(frame)
+  }, [])
+
+  useEffect(() => {
+    const next = new Set<string>()
+    if (playing && currentStationId) {
+      const station = atlasData.stationMap[currentStationId]
+      let id: string | undefined = station?.primaryStyleId
+      while (id) {
+        next.add(id)
+        id = atlasData.nodeMap[id]?.parentId
+      }
+    }
+    stationPulseIdsRef.current = next
+  }, [playing, currentStationId])
+
+  // Pulsing nodes — only the playing station's style (L3) and its L2 / L1 ancestors
+  useEffect(() => {
+    let pt = 0
+
+    const tick = () => {
+      pt += 0.014
+      const svgEl = graphRef.current
+      if (svgEl) {
+        const { bass, energy } = audioDataRef.current
+        const pulseIds = stationPulseIdsRef.current
+        const audioRingBoost = 1 + bass * 0.38 + energy * 0.14
+        const audioOpacityBoost = bass * 0.22 + energy * 0.08
+
+        d3.select(svgEl)
+          .selectAll<SVGGElement, RefNode>('g.nd')
+          .each(function (d, i) {
+            const grp = d3.select(this)
+            const baseR = d.level === 1 ? 27 : d.level === 2 ? 16 : 9
+            const phase = i * 0.62
+            const pulseThis = pulseIds.size > 0 && pulseIds.has(d.id)
+
+            if (!pulseThis) {
+              grp.select('circle.gring').attr('opacity', 0)
+              if (d.level === 1) grp.select('circle.gring-mid').attr('opacity', 0)
+              if (d.level <= 2) grp.select('circle.ncore').attr('r', baseR * 0.38)
+              if (d.level === 3) grp.select('circle.nbody').attr('r', baseR)
+              return
+            }
+
+            grp.select('circle.gring').attr('opacity', 1)
+            if (d.level === 1) grp.select('circle.gring-mid').attr('opacity', 1)
+
+            const ringFreq = d.level === 1 ? 0.36 : d.level === 2 ? 0.50 : 0.68
+            const ringScale = (1 + Math.sin(pt * ringFreq + phase) * 0.07) * audioRingBoost
+            grp
+              .select('circle.gring')
+              .attr('r', baseR * 1.9 * ringScale)
+              .attr('stroke-opacity', Math.min(0.13 + Math.abs(Math.sin(pt * 0.42 + phase)) * 0.1 + audioOpacityBoost, 0.72))
+
+            if (d.level <= 2) {
+              const audioCore = 1 + bass * 0.28
+              const coreScale = (1 + Math.sin(pt * 1.45 + phase + Math.PI * 0.3) * 0.22) * audioCore
+              grp.select('circle.ncore').attr('r', baseR * 0.38 * coreScale)
+            }
+
+            if (d.level === 3) {
+              const bodyScale = 1 + Math.sin(pt * 0.88 + phase) * 0.11 + energy * 0.08
+              grp.select('circle.nbody').attr('r', baseR * bodyScale)
+            }
+          })
+      }
+      pulseFrameRef.current = requestAnimationFrame(tick)
+    }
+
+    tick()
+    return () => {
+      if (pulseFrameRef.current) cancelAnimationFrame(pulseFrameRef.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -464,7 +685,7 @@ function App() {
 
     function clampSectorSpan(rootCount: number) {
       const naturalStep = TAU / Math.max(rootCount, 1)
-      return Math.min(1.46, naturalStep * 0.82)
+      return Math.min(1.78, naturalStep * 0.88)
     }
 
     function distributeOffset(index: number, total: number) {
@@ -517,7 +738,9 @@ function App() {
       const centerX = width() / 2
       const centerY = height() / 2
       const rootOrbit = Math.max(210, Math.min(width(), height()) * 0.34)
-      const sectorSpan = clampSectorSpan(rootNodes.length)
+      // When a root is expanded, use its own count (1) so children get the full angular room
+      const expandedRootCount = rootNodes.filter((r) => expanded.has(r.id)).length
+      const sectorSpan = clampSectorSpan(expandedRootCount > 0 ? expandedRootCount : rootNodes.length)
 
       rootNodes.forEach((root, rootIndex) => {
         const rootAngle = -Math.PI / 2 + (rootIndex / Math.max(rootNodes.length, 1)) * TAU
@@ -527,12 +750,12 @@ function App() {
 
         const level2Children = (childrenByParent[root.id] ?? []).filter((child) => visibleIds.has(child.id))
         const visibleGrandchildren = level2Children.reduce((sum, child) => sum + ((childrenByParent[child.id] ?? []).filter((grandchild) => visibleIds.has(grandchild.id)).length), 0)
-        const level2Orbit = 144 + Math.max(0, level2Children.length - 5) * 14 + visibleGrandchildren * 5
+        const level2Orbit = 172 + Math.max(0, level2Children.length - 4) * 20 + visibleGrandchildren * 6
         const rootDirX = Math.cos(rootAngle)
         const rootDirY = Math.sin(rootAngle)
         const rootTanX = Math.cos(rootAngle + Math.PI / 2)
         const rootTanY = Math.sin(rootAngle + Math.PI / 2)
-        const level2TangentLimit = Math.tan(sectorSpan / 2) * level2Orbit * 0.94
+        const level2TangentLimit = Math.tan(sectorSpan / 2) * level2Orbit * 0.96
 
         level2Children.forEach((child, childIndex) => {
           const level2Offset = distributeOffset(childIndex, level2Children.length)
@@ -542,14 +765,24 @@ function App() {
           targets.set(child.id, { x: childX, y: childY })
 
           const level3Children = (childrenByParent[child.id] ?? []).filter((grandchild) => visibleIds.has(grandchild.id))
-          const level3Orbit = 102 + Math.max(0, level3Children.length - 2) * 12 + Math.max(0, level2Children.length - 6) * 4
+          const l3Count = level3Children.length
+          const level3Orbit =
+            120 + Math.max(0, l3Count - 2) * 22 + Math.max(0, level2Children.length - 5) * 5
           const branchAngle = Math.atan2(childY - rootY, childX - rootX)
           const branchDirX = Math.cos(branchAngle)
           const branchDirY = Math.sin(branchAngle)
           const branchTanX = Math.cos(branchAngle + Math.PI / 2)
           const branchTanY = Math.sin(branchAngle + Math.PI / 2)
-          const level3Span = Math.min(1.08, sectorSpan * 0.84)
-          const level3TangentLimit = Math.tan(level3Span / 2) * level3Orbit * 0.94
+          const level3Span = Math.min(
+            Math.PI * 0.95,
+            Math.max(sectorSpan * 0.88, 0.52 + l3Count * 0.24),
+          )
+          let level3TangentLimit = Math.tan(level3Span / 2) * level3Orbit * 0.94
+          const l3Radius = 9
+          const minL3Gap = l3Radius * 2 + 38
+          if (l3Count > 1) {
+            level3TangentLimit = Math.max(level3TangentLimit, (minL3Gap * (l3Count - 1)) / 2)
+          }
 
           level3Children.forEach((grandchild, grandchildIndex) => {
             const offset = distributeOffset(grandchildIndex, level3Children.length)
@@ -578,11 +811,11 @@ function App() {
             if (!source) return 90
             if (source.level === 1) {
               const branchCount = childrenByParent[source.id]?.length ?? 0
-              return 132 + Math.max(0, branchCount - 5) * 16
+              return 155 + Math.max(0, branchCount - 4) * 20
             }
             if (source.level === 2) {
               const leafCount = childrenByParent[source.id]?.length ?? 0
-              return 98 + Math.max(0, leafCount - 2) * 18
+              return 118 + Math.max(0, leafCount - 2) * 24
             }
             return 60
           })
@@ -591,8 +824,14 @@ function App() {
             return source?.level === 2 ? 1.08 : 0.9
           }),
       )
-      .force('charge', d3.forceManyBody<RefNode>().strength((d) => (d.level === 1 ? -320 : d.level === 2 ? -90 : -48)))
-      .force('collision', d3.forceCollide<RefNode>().radius((d) => nr(d) + (d.level === 1 ? 34 : d.level === 2 ? 22 : 16)))
+      .force('charge', d3.forceManyBody<RefNode>().strength((d) => (d.level === 1 ? -320 : d.level === 2 ? -140 : -110)))
+      .force(
+        'collision',
+        d3
+          .forceCollide<RefNode>()
+          .radius((d) => nr(d) + (d.level === 1 ? 34 : d.level === 2 ? 28 : 30))
+          .iterations(3),
+      )
       .force('center', d3.forceCenter())
 
     simulation.on('tick', () => {
@@ -667,20 +906,20 @@ function App() {
         'orbit-x',
         d3
           .forceX<RefNode>((d) => targets.get(d.id)?.x ?? width() / 2)
-          .strength((d) => (d.level === 1 ? 0.3 : d.level === 2 ? 0.72 : 0.84)),
+          .strength((d) => (d.level === 1 ? 0.3 : d.level === 2 ? 0.58 : 0.68)),
       )
       simulation.force(
         'orbit-y',
         d3
           .forceY<RefNode>((d) => targets.get(d.id)?.y ?? height() / 2)
-          .strength((d) => (d.level === 1 ? 0.3 : d.level === 2 ? 0.72 : 0.84)),
+          .strength((d) => (d.level === 1 ? 0.3 : d.level === 2 ? 0.58 : 0.68)),
       )
 
       visibleNodes.forEach((node) => {
         const target = targets.get(node.id)
         if (!target) return
         if (node.x === undefined || node.y === undefined || initial) {
-          const jitter = node.level === 1 ? 18 : node.level === 2 ? 10 : 6
+          const jitter = node.level === 1 ? 18 : node.level === 2 ? 10 : 4
           node.x = target.x + (Math.random() - 0.5) * jitter
           node.y = target.y + (Math.random() - 0.5) * jitter
         }
@@ -779,16 +1018,19 @@ function App() {
         .attr('stroke', (d) => nodeColor(d))
         .attr('stroke-width', 0.5)
         .attr('stroke-opacity', 0.2)
+        .attr('opacity', 0)
         .attr('filter', (d) => (d.level === 1 ? 'url(#glow10)' : d.level === 2 ? 'url(#glow6)' : 'url(#glow3)'))
 
       entered
         .filter((d) => d.level === 1)
         .append('circle')
+        .attr('class', 'gring-mid')
         .attr('r', (d) => nr(d) * 1.35)
         .attr('fill', 'none')
         .attr('stroke', (d) => nodeColor(d))
         .attr('stroke-width', 0.6)
         .attr('stroke-opacity', 0.4)
+        .attr('opacity', 0)
         .attr('filter', 'url(#glow6)')
 
       entered
