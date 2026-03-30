@@ -62,15 +62,23 @@ body{
 #pl-name{font-family:'Cinzel',serif;font-size:14px;font-weight:600;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
 #pl-track{font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
 .pl-idle{color:var(--text-dim);font-style:italic;font-size:13px;font-family:'EB Garamond',serif;font-weight:400}
-.pl-bars{display:flex;align-items:flex-end;gap:2px;height:18px;flex-shrink:0;margin:0 4px}
-.bar{width:3px;background:var(--gold);border-radius:2px;opacity:0;transition:opacity .3s}
-.bar.on{opacity:1}
-.bar:nth-child(1){animation:b 0.7s ease-in-out infinite alternate;height:40%}
-.bar:nth-child(2){animation:b 0.9s ease-in-out infinite alternate .1s;height:70%}
-.bar:nth-child(3){animation:b 0.6s ease-in-out infinite alternate .2s;height:100%}
-.bar:nth-child(4){animation:b 0.8s ease-in-out infinite alternate .1s;height:60%}
-.bar:nth-child(5){animation:b 0.7s ease-in-out infinite alternate 0s;height:35%}
-@keyframes b{from{transform:scaleY(.5)}to{transform:scaleY(1)}}
+.pl-wave{width:180px;height:28px;flex-shrink:0;margin:0 4px;opacity:.82}
+.pl-wave svg{width:100%;height:100%;overflow:visible}
+.wave-glow{fill:none;stroke:rgba(212,168,83,.12);stroke-width:5.5;stroke-linecap:round;stroke-linejoin:round}
+.wave-line{fill:none;stroke:var(--gold);stroke-width:1.35;stroke-linecap:round;stroke-linejoin:round}
+.wave-glow-real{stroke-width:6.5;stroke:rgba(212,168,83,.16)}
+.wave-line-real{stroke-width:1.7;filter:drop-shadow(0 0 4px rgba(212,168,83,.25))}
+.wave-line-b{opacity:.35}
+.pl-wave-idle .wave-line{opacity:.42}
+.pl-wave-idle .wave-line-b{opacity:.18}
+.pl-wave-real{opacity:.96}
+.pl-wave-loading .wave-line,.pl-wave-loading .wave-line-b{stroke-dasharray:10 14;animation:wave-dash 1.4s linear infinite}
+.pl-wave-playing .wave-line-a{stroke-dasharray:24 8;animation:wave-dash 1.8s linear infinite, wave-pulse-a 2.6s ease-in-out infinite}
+.pl-wave-playing .wave-line-b{stroke-dasharray:14 10;animation:wave-dash-rev 1.4s linear infinite, wave-pulse-b 1.9s ease-in-out infinite}
+@keyframes wave-dash{to{stroke-dashoffset:-48}}
+@keyframes wave-dash-rev{to{stroke-dashoffset:48}}
+@keyframes wave-pulse-a{0%,100%{opacity:.9}50%{opacity:1}}
+@keyframes wave-pulse-b{0%,100%{opacity:.28}50%{opacity:.62}}
 .pl-ctrls{display:flex;gap:10px;flex-shrink:0}
 .cbtn{width:34px;height:34px;border-radius:50%;background:rgba(212,168,83,.05);border:1px solid rgba(212,168,83,.18);color:var(--gold);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
 .cbtn:hover{background:rgba(212,168,83,.15);border-color:var(--gold)}

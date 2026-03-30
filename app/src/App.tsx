@@ -66,6 +66,20 @@ type SomaChannelsResponse = {
   }[]
 }
 
+function buildWaveformPath(samples: number[], width: number, height: number) {
+  if (!samples.length) return ''
+
+  const stepX = width / Math.max(samples.length - 1, 1)
+  const midY = height / 2
+  const amplitude = height * 0.36
+
+  return samples.reduce((path, sample, index) => {
+    const x = index * stepX
+    const y = midY + (sample - 0.5) * amplitude * 2
+    return `${path}${index === 0 ? 'M' : ' L'}${x.toFixed(2)} ${y.toFixed(2)}`
+  }, '')
+}
+
 async function loadSoundparkDeepNowPlaying() {
   const masterResponse = await fetch('https://h.getradio.me/spdeep/hls.m3u8')
   if (!masterResponse.ok) throw new Error(`Soundpark master returned ${masterResponse.status}`)
@@ -104,6 +118,10 @@ function App() {
   const orreryRef = useRef<SVGCircleElement | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const hlsRef = useRef<Hls | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null)
+  const waveformFrameRef = useRef<number | null>(null)
   const viewportRef = useRef({ x: 0, y: 0, k: 1, focusX: 0, focusY: 0 })
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -123,6 +141,7 @@ function App() {
   const [currentTrackTitle, setCurrentTrackTitle] = useState('')
   const [playing, setPlaying] = useState(false)
   const [volume, setVolume] = useState(75)
+  const [waveformSamples, setWaveformSamples] = useState<number[] | null>(null)
 
   const selectedNode = useMemo(() => (selectedId ? atlasData.nodeMap[selectedId] : null), [selectedId])
 
@@ -293,17 +312,56 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!audioRef.current) audioRef.current = new Audio()
+    if (!audioRef.current) {
+      audioRef.current = new Audio()
+      audioRef.current.crossOrigin = 'anonymous'
+    }
     audioRef.current.volume = volume / 100
   }, [volume])
 
   useEffect(() => {
     return () => {
+      if (waveformFrameRef.current) cancelAnimationFrame(waveformFrameRef.current)
       hlsRef.current?.destroy()
       hlsRef.current = null
       audioRef.current?.pause()
+      audioContextRef.current?.close()
     }
   }, [])
+
+  useEffect(() => {
+    if (!playing || !analyserRef.current) {
+      setWaveformSamples(null)
+      if (waveformFrameRef.current) cancelAnimationFrame(waveformFrameRef.current)
+      waveformFrameRef.current = null
+      return
+    }
+
+    const analyser = analyserRef.current
+    const timeData = new Uint8Array(analyser.fftSize)
+
+    const tick = () => {
+      analyser.getByteTimeDomainData(timeData)
+
+      const sampled = Array.from({ length: 40 }, (_, index) => {
+        const dataIndex = Math.floor((index / 39) * (timeData.length - 1))
+        return timeData[dataIndex] / 255
+      })
+
+      const min = Math.min(...sampled)
+      const max = Math.max(...sampled)
+      setWaveformSamples(max - min > 0.025 ? sampled : null)
+
+      waveformFrameRef.current = requestAnimationFrame(tick)
+    }
+
+    tick()
+
+    return () => {
+      if (waveformFrameRef.current) cancelAnimationFrame(waveformFrameRef.current)
+      waveformFrameRef.current = null
+    }
+  }, [playing, currentStationId])
 
   useEffect(() => {
     const channelId = currentStationId ? SOMAFM_CHANNELS[currentStationId] : undefined
@@ -736,6 +794,8 @@ function App() {
     return atlasData.stations.filter((station) => station.styleIds.includes(selectedNode.id))
   }, [selectedNode])
 
+  const realWavePath = useMemo(() => (waveformSamples ? buildWaveformPath(waveformSamples, 180, 28) : ''), [waveformSamples])
+
   function clearCurrentStream() {
     hlsRef.current?.destroy()
     hlsRef.current = null
@@ -746,10 +806,47 @@ function App() {
     audioRef.current.load()
   }
 
+  async function ensureAudioAnalyser() {
+    if (!audioRef.current) return false
+
+    try {
+      if (!audioContextRef.current) {
+        const AudioContextCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+        if (!AudioContextCtor) return false
+        audioContextRef.current = new AudioContextCtor()
+      }
+
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume()
+      }
+
+      if (!mediaSourceRef.current) {
+        mediaSourceRef.current = audioContextRef.current.createMediaElementSource(audioRef.current)
+      }
+
+      if (!analyserRef.current) {
+        const analyser = audioContextRef.current.createAnalyser()
+        analyser.fftSize = 256
+        analyser.smoothingTimeConstant = 0.82
+        mediaSourceRef.current.connect(analyser)
+        analyser.connect(audioContextRef.current.destination)
+        analyserRef.current = analyser
+      }
+
+      return true
+    } catch {
+      analyserRef.current = null
+      setWaveformSamples(null)
+      return false
+    }
+  }
+
   async function startStream(streamUrl: string) {
     if (!audioRef.current) return false
 
     clearCurrentStream()
+    audioRef.current.crossOrigin = 'anonymous'
+    await ensureAudioAnalyser()
 
     const isHlsStream = streamUrl.includes('.m3u8')
     if (isHlsStream) {
@@ -781,6 +878,7 @@ function App() {
     if (currentStationId === station.id) {
       if (audioRef.current.paused) {
         setLoadingStationId(station.id)
+        void ensureAudioAnalyser()
         void audioRef.current
           .play()
           .then(() => setPlaying(true))
@@ -817,6 +915,7 @@ function App() {
   function toggleAudio() {
     if (!audioRef.current || !currentStationId) return
     if (audioRef.current.paused) {
+      void ensureAudioAnalyser()
       void audioRef.current.play()
       setPlaying(true)
     } else {
@@ -824,6 +923,8 @@ function App() {
       setPlaying(false)
     }
   }
+
+  const waveformState = loadingStationId ? 'loading' : playing ? 'playing' : 'idle'
 
   return (
     <>
@@ -909,12 +1010,21 @@ function App() {
           <div id="pl-name">{currentName ? <span>{currentName}</span> : <span className="pl-idle">Select a star to begin transmission…</span>}</div>
           {currentTrackTitle ? <div id="pl-track">Now Playing: {currentTrackTitle}</div> : null}
         </div>
-        <div className="pl-bars" id="pl-bars">
-          <div className={`bar${playing ? ' on' : ''}`} />
-          <div className={`bar${playing ? ' on' : ''}`} />
-          <div className={`bar${playing ? ' on' : ''}`} />
-          <div className={`bar${playing ? ' on' : ''}`} />
-          <div className={`bar${playing ? ' on' : ''}`} />
+        <div className={`pl-wave ${waveformSamples ? 'pl-wave-real' : `pl-wave-${waveformState}`}`} aria-hidden="true">
+          <svg viewBox="0 0 180 28" xmlns="http://www.w3.org/2000/svg">
+            {waveformSamples ? (
+              <>
+                <path className="wave-glow wave-glow-real" d={realWavePath} />
+                <path className="wave-line wave-line-real" d={realWavePath} />
+              </>
+            ) : (
+              <>
+                <path className="wave-glow" d="M2 14 C10 14, 14 9, 22 9 S34 19, 42 19 S54 10, 62 10 S74 18, 82 18 S94 11, 102 11 S114 17, 122 17 S134 12, 142 12 S154 16, 162 16 S170 14, 178 14" />
+                <path className="wave-line wave-line-a" d="M2 14 C10 14, 14 9, 22 9 S34 19, 42 19 S54 10, 62 10 S74 18, 82 18 S94 11, 102 11 S114 17, 122 17 S134 12, 142 12 S154 16, 162 16 S170 14, 178 14" />
+                <path className="wave-line wave-line-b" d="M2 14 C10 14, 14 16, 22 16 S34 8, 42 8 S54 17, 62 17 S74 9, 82 9 S94 16, 102 16 S114 10, 122 10 S134 15, 142 15 S154 11, 162 11 S170 14, 178 14" />
+              </>
+            )}
+          </svg>
         </div>
         <div className="pl-ctrls">
           <button className={`cbtn${playing ? ' on' : ''}${loadingStationId ? ' loading' : ''}`} id="cb-pause" title="Pause / Resume" onClick={toggleAudio}>
