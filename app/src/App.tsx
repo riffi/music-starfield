@@ -750,6 +750,7 @@ function App() {
     const nodeG = g.append('g')
     const labelG = g.append('g')
     const expanded = new Set<string>()
+    let previousGraphActiveRootId: string | null = null
 
     function getL1(node: RefNode) {
       if (node.level === 1) return node
@@ -807,6 +808,47 @@ function App() {
       return { visibleNodes, visibleLinks }
     }
 
+    function placeLevel3Fan(
+      child: RefNode,
+      childX: number,
+      childY: number,
+      rootX: number,
+      rootY: number,
+      sectorSpan: number,
+      level2SiblingCount: number,
+      visibleIds: Set<string>,
+    ): { id: string; x: number; y: number }[] {
+      const level3Children = (childrenByParent[child.id] ?? []).filter((g) => visibleIds.has(g.id))
+      const l3Count = level3Children.length
+      if (l3Count === 0) return []
+      const level3Orbit =
+        120 + Math.max(0, l3Count - 2) * 22 + Math.max(0, level2SiblingCount - 5) * 5
+      const branchAngle = Math.atan2(childY - rootY, childX - rootX)
+      const branchDirX = Math.cos(branchAngle)
+      const branchDirY = Math.sin(branchAngle)
+      const branchTanX = Math.cos(branchAngle + Math.PI / 2)
+      const branchTanY = Math.sin(branchAngle + Math.PI / 2)
+      const level3Span = Math.min(
+        Math.PI * 0.95,
+        Math.max(sectorSpan * 0.88, 0.52 + l3Count * 0.24),
+      )
+      let level3TangentLimit = Math.tan(level3Span / 2) * level3Orbit * 0.94
+      const l3Radius = 9
+      const minL3Gap = l3Radius * 2 + 38
+      if (l3Count > 1) {
+        level3TangentLimit = Math.max(level3TangentLimit, (minL3Gap * (l3Count - 1)) / 2)
+      }
+      return level3Children.map((grandchild, grandchildIndex) => {
+        const offset = distributeOffset(grandchildIndex, level3Children.length)
+        const branchSpread = level3TangentLimit * offset
+        return {
+          id: grandchild.id,
+          x: childX + branchDirX * level3Orbit + branchTanX * branchSpread,
+          y: childY + branchDirY * level3Orbit + branchTanY * branchSpread,
+        }
+      })
+    }
+
     function computeTargets(visibleNodes: RefNode[]) {
       const targets = new Map<string, { x: number; y: number }>()
       const visibleIds = new Set(visibleNodes.map((node) => node.id))
@@ -824,49 +866,24 @@ function App() {
         targets.set(root.id, { x: rootX, y: rootY })
 
         const level2Children = (childrenByParent[root.id] ?? []).filter((child) => visibleIds.has(child.id))
-        const visibleGrandchildren = level2Children.reduce((sum, child) => sum + ((childrenByParent[child.id] ?? []).filter((grandchild) => visibleIds.has(grandchild.id)).length), 0)
-        const level2Orbit = 172 + Math.max(0, level2Children.length - 4) * 20 + visibleGrandchildren * 6
+        const baseLevel2Orbit = 172 + Math.max(0, level2Children.length - 4) * 20
         const rootDirX = Math.cos(rootAngle)
         const rootDirY = Math.sin(rootAngle)
         const rootTanX = Math.cos(rootAngle + Math.PI / 2)
         const rootTanY = Math.sin(rootAngle + Math.PI / 2)
-        const level2TangentLimit = Math.tan(sectorSpan / 2) * level2Orbit * 0.96
+
+        const level2TangentLimit = Math.tan(sectorSpan / 2) * baseLevel2Orbit * 0.96
 
         level2Children.forEach((child, childIndex) => {
           const level2Offset = distributeOffset(childIndex, level2Children.length)
           const tangentSpread = level2TangentLimit * level2Offset
-          const childX = rootX + rootDirX * level2Orbit + rootTanX * tangentSpread
-          const childY = rootY + rootDirY * level2Orbit + rootTanY * tangentSpread
+          const childX = rootX + rootDirX * baseLevel2Orbit + rootTanX * tangentSpread
+          const childY = rootY + rootDirY * baseLevel2Orbit + rootTanY * tangentSpread
           targets.set(child.id, { x: childX, y: childY })
 
-          const level3Children = (childrenByParent[child.id] ?? []).filter((grandchild) => visibleIds.has(grandchild.id))
-          const l3Count = level3Children.length
-          const level3Orbit =
-            120 + Math.max(0, l3Count - 2) * 22 + Math.max(0, level2Children.length - 5) * 5
-          const branchAngle = Math.atan2(childY - rootY, childX - rootX)
-          const branchDirX = Math.cos(branchAngle)
-          const branchDirY = Math.sin(branchAngle)
-          const branchTanX = Math.cos(branchAngle + Math.PI / 2)
-          const branchTanY = Math.sin(branchAngle + Math.PI / 2)
-          const level3Span = Math.min(
-            Math.PI * 0.95,
-            Math.max(sectorSpan * 0.88, 0.52 + l3Count * 0.24),
-          )
-          let level3TangentLimit = Math.tan(level3Span / 2) * level3Orbit * 0.94
-          const l3Radius = 9
-          const minL3Gap = l3Radius * 2 + 38
-          if (l3Count > 1) {
-            level3TangentLimit = Math.max(level3TangentLimit, (minL3Gap * (l3Count - 1)) / 2)
+          for (const p of placeLevel3Fan(child, childX, childY, rootX, rootY, sectorSpan, level2Children.length, visibleIds)) {
+            targets.set(p.id, { x: p.x, y: p.y })
           }
-
-          level3Children.forEach((grandchild, grandchildIndex) => {
-            const offset = distributeOffset(grandchildIndex, level3Children.length)
-            const branchSpread = level3TangentLimit * offset
-            targets.set(grandchild.id, {
-              x: childX + branchDirX * level3Orbit + branchTanX * branchSpread,
-              y: childY + branchDirY * level3Orbit + branchTanY * branchSpread,
-            })
-          })
         })
       })
 
@@ -896,7 +913,7 @@ function App() {
           })
           .strength((d) => {
             const source = typeof d.source === 'object' ? d.source : nodeMap[d.source]
-            return source?.level === 2 ? 1.08 : 0.9
+            return source?.level === 2 ? 0.68 : 0.9
           }),
       )
       .force('charge', d3.forceManyBody<RefNode>().strength((d) => (d.level === 1 ? -320 : d.level === 2 ? -140 : -110)))
@@ -909,7 +926,7 @@ function App() {
       )
       .force('center', d3.forceCenter())
 
-    simulation.on('tick', () => {
+    function syncGraphDom() {
       linkG
         .selectAll<SVGLineElement, d3.SimulationLinkDatum<RefNode>>('line.edge')
         .attr('x1', (d) => (d.source as RefNode).x ?? 0)
@@ -922,7 +939,9 @@ function App() {
         .selectAll<SVGTextElement, RefNode>('text.lbl')
         .attr('x', (d) => d.x ?? 0)
         .attr('y', (d) => d.y ?? 0)
-    })
+    }
+
+    simulation.on('tick', syncGraphDom)
 
     function deselect() {
       nodeG
@@ -967,36 +986,60 @@ function App() {
           expanded.add(node.id)
         }
         update(false)
+      } else {
+        // Leaf node click — drag 'start' briefly restarted the simulation.
+        // Stop it immediately so forces don't drift nodes off their positions.
+        simulation.stop()
+        simulation.alpha(0)
       }
       highlight(node.id)
       refreshPanel(node)
     }
 
     function update(initial: boolean) {
+      if (!initial) simulation.stop()
+
       const { visibleNodes, visibleLinks } = getVisible()
+      const visibleIds = new Set(visibleNodes.map((n) => n.id))
       const targets = computeTargets(visibleNodes)
       const activeRootId = getActiveRootId()
+      const expandedRootCount = rootNodes.filter((r) => expanded.has(r.id)).length
+      const sectorSpanForTween = clampSectorSpan(expandedRootCount > 0 ? expandedRootCount : rootNodes.length)
+      const rootDimmingChanged = initial || activeRootId !== previousGraphActiveRootId
+      previousGraphActiveRootId = activeRootId
+
       simulation.force('center', d3.forceCenter(width() / 2, height() / 2))
       simulation.force(
         'orbit-x',
         d3
           .forceX<RefNode>((d) => targets.get(d.id)?.x ?? width() / 2)
-          .strength((d) => (d.level === 1 ? 0.3 : d.level === 2 ? 0.58 : 0.68)),
+          .strength((d) => (d.level === 1 ? 0.3 : d.level === 2 ? 0.76 : 0.68)),
       )
       simulation.force(
         'orbit-y',
         d3
           .forceY<RefNode>((d) => targets.get(d.id)?.y ?? height() / 2)
-          .strength((d) => (d.level === 1 ? 0.3 : d.level === 2 ? 0.58 : 0.68)),
+          .strength((d) => (d.level === 1 ? 0.3 : d.level === 2 ? 0.76 : 0.68)),
       )
 
       visibleNodes.forEach((node) => {
         const target = targets.get(node.id)
         if (!target) return
         if (node.x === undefined || node.y === undefined || initial) {
-          const jitter = node.level === 1 ? 18 : node.level === 2 ? 10 : 4
-          node.x = target.x + (Math.random() - 0.5) * jitter
-          node.y = target.y + (Math.random() - 0.5) * jitter
+          if (initial) {
+            const jitter = node.level === 1 ? 18 : node.level === 2 ? 10 : 4
+            node.x = target.x + (Math.random() - 0.5) * jitter
+            node.y = target.y + (Math.random() - 0.5) * jitter
+          } else {
+            const p = node.parent ? nodeMap[node.parent] : null
+            if (p?.x != null && p?.y != null) {
+              node.x = p.x
+              node.y = p.y
+            } else {
+              node.x = target.x
+              node.y = target.y
+            }
+          }
         }
       })
 
@@ -1038,12 +1081,7 @@ function App() {
         .enter()
         .append('g')
         .attr('class', 'nd')
-        .attr('transform', (d) => {
-          const parent = d.parent ? nodeMap[d.parent] : null
-          const px = parent?.x ?? width() / 2
-          const py = parent?.y ?? height() / 2
-          return `translate(${px + (Math.random() - 0.5) * 30},${py + (Math.random() - 0.5) * 30})`
-        })
+        .attr('transform', (d) => `translate(${d.x ?? width() / 2},${d.y ?? height() / 2})`)
         .style('opacity', 0)
         .style('cursor', 'pointer')
         .call(
@@ -1051,11 +1089,15 @@ function App() {
             .drag<SVGGElement, RefNode>()
             .on('start', (event, d) => {
               event.sourceEvent.stopPropagation()
-              if (!event.active) simulation.alphaTarget(0.3).restart()
+              // Plain clicks also fire drag start, so keep the node pinned without
+              // waking the simulation until real pointer movement happens.
               d.fx = d.x
               d.fy = d.y
             })
             .on('drag', (event, d) => {
+              // Wake the simulation only after an actual drag move.
+              svg.interrupt('graphLayout')
+              simulation.alphaTarget(0.3).restart()
               d.fx = event.x
               d.fy = event.y
             })
@@ -1206,36 +1248,111 @@ function App() {
       labelSelection.exit().transition().duration(300).style('opacity', 0).remove()
       nodeSelection.exit().transition().duration(300).style('opacity', 0).remove()
 
-      activeNodeSelection
-        .transition()
-        .duration(420)
-        .style('opacity', (d) => {
-          if (!activeRootId) return 1
-          return nodeBelongsToRoot(d, activeRootId) ? 1 : d.level === 1 ? 0.34 : 0.12
-        })
+      const dimNodeOpacity = (d: RefNode) => {
+        if (!activeRootId) return 1
+        return nodeBelongsToRoot(d, activeRootId) ? 1 : d.level === 1 ? 0.34 : 0.12
+      }
+      const dimLabelOpacity = (d: RefNode) => {
+        if (!activeRootId) return 1
+        return nodeBelongsToRoot(d, activeRootId) ? 1 : d.level === 1 ? 0.42 : 0.14
+      }
+      const dimLinkOpacity = (d: RefLink) => {
+        if (!activeRootId) return 1
+        const source = typeof d.source === 'object' ? d.source : nodeMap[d.source]
+        const target = typeof d.target === 'object' ? d.target : nodeMap[d.target]
+        return nodeBelongsToRoot(source, activeRootId) && nodeBelongsToRoot(target, activeRootId) ? 1 : 0.1
+      }
 
-      activeLabelSelection
-        .transition()
-        .duration(420)
-        .style('opacity', (d) => {
-          if (!activeRootId) return 1
-          return nodeBelongsToRoot(d, activeRootId) ? 1 : d.level === 1 ? 0.42 : 0.14
-        })
-
-      activeLinkSelection
-        .transition()
-        .duration(420)
-        .style('opacity', (d) => {
-          if (!activeRootId) return 1
-          const source = typeof d.source === 'object' ? d.source : nodeMap[d.source]
-          const target = typeof d.target === 'object' ? d.target : nodeMap[d.target]
-          return nodeBelongsToRoot(source, activeRootId) && nodeBelongsToRoot(target, activeRootId) ? 1 : 0.1
-        })
+      if (rootDimmingChanged) {
+        activeNodeSelection
+          .transition()
+          .duration(420)
+          .style('opacity', (d) => dimNodeOpacity(d))
+        activeLabelSelection
+          .transition()
+          .duration(420)
+          .style('opacity', (d) => dimLabelOpacity(d))
+        activeLinkSelection
+          .transition()
+          .duration(420)
+          .style('opacity', (d) => dimLinkOpacity(d))
+      } else {
+        activeNodeSelection.style('opacity', (d) => dimNodeOpacity(d))
+        activeLabelSelection.style('opacity', (d) => dimLabelOpacity(d))
+        activeLinkSelection.style('opacity', (d) => dimLinkOpacity(d))
+      }
 
       simulation.nodes(visibleNodes)
       const linkForce = simulation.force<d3.ForceLink<RefNode, RefLink>>('link')
       linkForce?.links(visibleLinks)
-      simulation.alpha(initial ? 1 : 0.4).restart()
+
+      if (!initial) {
+        svg.interrupt('graphLayout')
+
+        // Placed before startPos so L3 positions are correct when DOM was already created
+        function applyL3FromCurrentL2() {
+          rootNodes.forEach((root) => {
+            if (!visibleIds.has(root.id)) return
+            const rootX = root.x ?? targets.get(root.id)!.x
+            const rootY = root.y ?? targets.get(root.id)!.y
+            const level2Children = (childrenByParent[root.id] ?? []).filter((c) => visibleIds.has(c.id))
+            for (const child of level2Children) {
+              const cx = child.x ?? targets.get(child.id)!.x
+              const cy = child.y ?? targets.get(child.id)!.y
+              for (const p of placeLevel3Fan(child, cx, cy, rootX, rootY, sectorSpanForTween, level2Children.length, visibleIds)) {
+                const n = nodeMap[p.id]
+                n.x = p.x
+                n.y = p.y
+              }
+            }
+          })
+        }
+
+        // Pre-place L3 nodes at their fan positions based on current L2 positions
+        // so they don't snap from parent-centre to fan in the first animation frame.
+        applyL3FromCurrentL2()
+        syncGraphDom()
+
+        const startPos = new Map(
+          visibleNodes
+            .filter((d) => d.level <= 2)
+            .map((d) => {
+              const t = targets.get(d.id)!
+              return [d.id, { x: d.x ?? t.x, y: d.y ?? t.y }] as const
+            }),
+        )
+        svg
+          .transition('graphLayout')
+          .duration(440)
+          .ease(d3.easeLinear)
+          .tween('graphLayout', () => {
+            return (u: number) => {
+              for (const d of visibleNodes) {
+                if (d.level === 3) continue
+                const tgt = targets.get(d.id)!
+                const s = startPos.get(d.id)!
+                d.x = s.x + (tgt.x - s.x) * u
+                d.y = s.y + (tgt.y - s.y) * u
+              }
+              applyL3FromCurrentL2()
+              syncGraphDom()
+            }
+          })
+          .on('end', () => {
+            for (const d of visibleNodes) {
+              const tgt = targets.get(d.id)!
+              d.x = tgt.x
+              d.y = tgt.y
+              d.vx = 0
+              d.vy = 0
+            }
+            // Bring alpha to zero so a stray restart() can't nudge nodes off their targets
+            simulation.alpha(0)
+            syncGraphDom()
+          })
+      } else {
+        simulation.alpha(1).restart()
+      }
 
       const focusTransform = (() => {
         if (!activeRootId) {
@@ -1251,11 +1368,17 @@ function App() {
         return d3.zoomIdentity.translate(width() / 2, height() / 2).scale(scale).translate(-rootTarget.x, -rootTarget.y)
       })()
 
-      svg
-        .transition()
-        .duration(initial ? 100 : 700)
-        .ease(d3.easeCubicOut)
-        .call(zoomBehavior.transform, focusTransform)
+      // Only re-trigger the zoom transition when the active root itself changes
+      // (L1 expand/collapse/switch). Expanding L2/L3 within the same root must not
+      // restart the pan animation — that causes all visible nodes to appear to
+      // "redistribute" while the viewport is animating.
+      if (rootDimmingChanged) {
+        svg
+          .transition()
+          .duration(initial ? 100 : 700)
+          .ease(d3.easeCubicOut)
+          .call(zoomBehavior.transform, focusTransform)
+      }
     }
 
     const zoomBehavior = d3
