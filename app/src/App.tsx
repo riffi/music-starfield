@@ -976,6 +976,13 @@ function App() {
       })
     }
 
+    function collapseOtherLevel2Branches(activeLevel2Id: string, parentRootId: string | null) {
+      if (!parentRootId) return
+      ;(childrenByParent[parentRootId] ?? []).forEach((child) => {
+        if (child.id !== activeLevel2Id) collapseAll(child.id)
+      })
+    }
+
     function clickNode(node: RefNode) {
       const hasKids = nodes.some((item) => item.parent === node.id)
       if (hasKids) {
@@ -983,12 +990,11 @@ function App() {
         else {
           const rootId = getL1(node)?.id
           if (rootId) collapseOtherRoots(rootId)
+          if (node.level === 2) collapseOtherLevel2Branches(node.id, node.parent)
           expanded.add(node.id)
         }
         update(false)
       } else {
-        // Leaf node click — drag 'start' briefly restarted the simulation.
-        // Stop it immediately so forces don't drift nodes off their positions.
         simulation.stop()
         simulation.alpha(0)
       }
@@ -1084,29 +1090,6 @@ function App() {
         .attr('transform', (d) => `translate(${d.x ?? width() / 2},${d.y ?? height() / 2})`)
         .style('opacity', 0)
         .style('cursor', 'pointer')
-        .call(
-          d3
-            .drag<SVGGElement, RefNode>()
-            .on('start', (event, d) => {
-              event.sourceEvent.stopPropagation()
-              // Plain clicks also fire drag start, so keep the node pinned without
-              // waking the simulation until real pointer movement happens.
-              d.fx = d.x
-              d.fy = d.y
-            })
-            .on('drag', (event, d) => {
-              // Wake the simulation only after an actual drag move.
-              svg.interrupt('graphLayout')
-              simulation.alphaTarget(0.3).restart()
-              d.fx = event.x
-              d.fy = event.y
-            })
-            .on('end', (event, d) => {
-              if (!event.active) simulation.alphaTarget(0)
-              d.fx = null
-              d.fy = null
-            }),
-        )
         .on('click', (event, d) => {
           event.stopPropagation()
           clickNode(d)
@@ -1611,7 +1594,7 @@ function App() {
           {!selectedNode ? null : panelStations.length ? (
             <>
               {atlasData.childMap[selectedNode.id]?.length ? (
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic', marginBottom: 14, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 4, lineHeight: 1.5 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic', marginBottom: 14, padding: '8px 10px', border: '1px solid var(--line-soft)', background: 'rgba(255,255,255,.018)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.02)', borderRadius: 4, lineHeight: 1.5 }}>
                   <span style={{ color: 'var(--gold)' }}>✦</span> Contains {atlasData.childMap[selectedNode.id].length} sub-genre{atlasData.childMap[selectedNode.id].length !== 1 ? 's' : ''}. Click the star to expand.
                 </div>
               ) : null}
