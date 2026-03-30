@@ -1,0 +1,530 @@
+import * as d3 from 'd3'
+import { useEffect, useRef } from 'react'
+import { TAU, levelLabels } from '../app/constants'
+import type { AudioLevels, HoveredNode, RefLink, RefNode, ViewportState } from '../app/types'
+import { atlasData } from '../data/atlas'
+import { computeRadioFlowEdgeKeys, pulseNodeIdsForPlayingStation } from '../data/selectors'
+
+type UseAtlasGraphArgs = {
+  referenceNodes: RefNode[]
+  currentStationId: string | null
+  playing: boolean
+  audioDataRef: React.MutableRefObject<AudioLevels>
+  viewportRef: React.MutableRefObject<ViewportState>
+  selectedId: string | null
+  setSelectedId: React.Dispatch<React.SetStateAction<string | null>>
+  setPanelOpen: React.Dispatch<React.SetStateAction<boolean>>
+  setHovered: React.Dispatch<React.SetStateAction<HoveredNode | null>>
+}
+
+export function useAtlasGraph({ referenceNodes, currentStationId, playing, audioDataRef, viewportRef, selectedId, setSelectedId, setPanelOpen, setHovered }: UseAtlasGraphArgs) {
+  const graphRef = useRef<SVGSVGElement | null>(null)
+  const pulseFrameRef = useRef<number | null>(null)
+  const stationPulseIdsRef = useRef<Set<string>>(new Set())
+  const flowEdgeKeysRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    const station = playing && currentStationId ? atlasData.stationMap[currentStationId] : undefined
+    stationPulseIdsRef.current = pulseNodeIdsForPlayingStation(station, selectedId)
+    flowEdgeKeysRef.current = computeRadioFlowEdgeKeys(station, selectedId, playing)
+  }, [playing, currentStationId, selectedId])
+
+  useEffect(() => {
+    let pt = 0
+    const tick = () => {
+      pt += 0.014
+      const svgEl = graphRef.current
+      if (svgEl) {
+        const { bass, energy } = audioDataRef.current
+        const pulseIds = stationPulseIdsRef.current
+        const pulseActive = pulseIds.size > 0
+        const audioRingBoost = 1 + bass * 0.34 + energy * 0.12
+        const audioOpacityBoost = bass * 0.18 + energy * 0.08
+        const branchPresenceBoost = pulseActive ? 1.015 : 1
+
+        d3.select(svgEl).selectAll<SVGGElement, RefNode>('g.nd').each(function (d, i) {
+          const grp = d3.select(this)
+          const baseR = d.level === 1 ? 27 : d.level === 2 ? 16 : 9
+          const phase = i * 0.62
+          const pulseThis = pulseIds.size > 0 && pulseIds.has(d.id)
+
+          if (!pulseThis) {
+            grp.select('circle.gring-halo').attr('opacity', 0)
+            grp.select('circle.gring-rim').attr('opacity', 0)
+            if (d.level === 1) {
+              grp.select('circle.gring-mid-halo').attr('opacity', 0)
+              grp.select('circle.gring-mid-rim').attr('opacity', 0)
+            }
+            if (d.level <= 2) grp.select('circle.ncore').attr('r', baseR * 0.38)
+            if (d.level === 3) grp.select('circle.nbody').attr('r', baseR)
+            return
+          }
+
+          const ringFreq = d.level === 1 ? 0.42 : d.level === 2 ? 0.58 : 0.76
+          const ringWave = Math.abs(Math.sin(pt * ringFreq + phase))
+          const levelRingAmplitude = d.level === 1 ? 0.07 : d.level === 2 ? 0.16 : 0.15
+          const levelHaloBase = d.level === 1 ? 0.09 : d.level === 2 ? 0.13 : 0.12
+          const levelHaloWave = d.level === 1 ? 0.05 : d.level === 2 ? 0.11 : 0.1
+          const levelHaloAudio = d.level === 1 ? 0.18 : d.level === 2 ? 0.44 : 0.38
+          const levelHaloCap = d.level === 1 ? 0.24 : d.level === 2 ? 0.46 : 0.4
+          const levelRimBase = d.level === 1 ? 0.065 : d.level === 2 ? 0.09 : 0.082
+          const levelRimWave = d.level === 1 ? 0.03 : d.level === 2 ? 0.072 : 0.06
+          const levelRimAudio = d.level === 1 ? 0.075 : d.level === 2 ? 0.22 : 0.18
+          const levelRimCap = d.level === 1 ? 0.13 : d.level === 2 ? 0.28 : 0.24
+          const ringScale = (1 + ringWave * levelRingAmplitude) * audioRingBoost * branchPresenceBoost
+          const haloFillOp = Math.min(levelHaloBase + ringWave * levelHaloWave + audioOpacityBoost * levelHaloAudio, levelHaloCap)
+          const rimStrokeOp = Math.min(levelRimBase + ringWave * levelRimWave + audioOpacityBoost * levelRimAudio, levelRimCap)
+
+          grp.select('circle.gring-halo').attr('opacity', 1).attr('r', baseR * 1.42 * ringScale).attr('fill-opacity', haloFillOp)
+          grp.select('circle.gring-rim').attr('opacity', 1).attr('r', baseR * 1.7 * ringScale).attr('stroke-opacity', rimStrokeOp)
+
+          if (d.level === 1) {
+            const midHalo = Math.min(haloFillOp * 0.98, 0.2)
+            const midRim = Math.min(rimStrokeOp * 1.02, 0.13)
+            grp.select('circle.gring-mid-halo').attr('opacity', 1).attr('r', baseR * 1.1 * ringScale).attr('fill-opacity', midHalo)
+            grp.select('circle.gring-mid-rim').attr('opacity', 1).attr('r', baseR * 1.28 * ringScale).attr('stroke-opacity', midRim)
+          }
+
+          if (d.level <= 2) {
+            const audioCore = 1 + bass * (d.level === 1 ? 0.17 : 0.34) + energy * (d.level === 1 ? 0.035 : 0.08)
+            const coreScale = (1 + Math.sin(pt * 1.62 + phase + Math.PI * 0.3) * (d.level === 1 ? 0.14 : 0.26)) * audioCore
+            grp.select('circle.ncore').attr('r', baseR * 0.38 * coreScale)
+          }
+
+          if (d.level === 3) {
+            const bodyScale = 1 + Math.sin(pt * 1.02 + phase) * 0.18 + bass * 0.08 + energy * 0.1
+            grp.select('circle.nbody').attr('r', baseR * bodyScale)
+          }
+        })
+
+        const flowKeys = flowEdgeKeysRef.current
+        const flowActive = flowKeys.size > 0
+        d3.select(svgEl).selectAll<SVGLineElement, RefLink>('line.edge').each(function (d) {
+          const src = typeof d.source === 'object' ? d.source : null
+          const tgt = typeof d.target === 'object' ? d.target : null
+          if (!src || !tgt) return
+          const key = `${src.id}>${tgt.id}`
+          const line = d3.select(this)
+          if (flowActive && flowKeys.has(key)) {
+            line.style('stroke-dasharray', src.level === 1 ? '7,10' : '4,8').style('stroke-dashoffset', '0').style('stroke-opacity', String(Math.min(0.34, 0.14 + audioOpacityBoost * 0.18))).style('stroke-width', String(src.level === 1 ? 1.55 : 1.02))
+          } else {
+            line.style('stroke-dasharray', src.level === 1 ? '5,5' : '2,5').style('stroke-dashoffset', null).style('stroke-opacity', '0.22').style('stroke-width', String(src.level === 1 ? 1.4 : 0.9))
+          }
+        })
+        d3.select(svgEl).selectAll<SVGLineElement, RefLink>('line.edge-flow').each(function (d) {
+          const src = typeof d.source === 'object' ? d.source : null
+          const tgt = typeof d.target === 'object' ? d.target : null
+          if (!src || !tgt) return
+          const key = `${src.id}>${tgt.id}`
+          const line = d3.select(this)
+          if (flowActive && flowKeys.has(key)) {
+            const ln = this as SVGLineElement
+            const len = ln.getTotalLength() || 48
+            const dashLen = Math.max(src.level === 1 ? 22 : 16, len * (src.level === 1 ? 0.18 : 0.14))
+            const gapLen = Math.max(src.level === 1 ? 34 : 24, len * 0.9)
+            const period = dashLen + gapLen
+            const flowOff = (pt * (src.level === 1 ? 62 : 54)) % period
+            const flowOpacity = Math.min(0.92, 0.34 + bass * 0.34 + energy * 0.22)
+            const flowWidth = (src.level === 1 ? 2.6 : 1.8) + bass * 0.7 + energy * 0.3
+            line.style('stroke-dasharray', `${dashLen} ${gapLen}`).style('stroke-dashoffset', String(-flowOff)).style('stroke-opacity', String(flowOpacity)).style('stroke-width', String(flowWidth))
+          } else {
+            line.style('stroke-dasharray', null).style('stroke-dashoffset', null).style('stroke-opacity', '0').style('stroke-width', '0')
+          }
+        })
+      }
+      pulseFrameRef.current = requestAnimationFrame(tick)
+    }
+    tick()
+    return () => {
+      if (pulseFrameRef.current) cancelAnimationFrame(pulseFrameRef.current)
+    }
+  }, [audioDataRef])
+
+  useEffect(() => {
+    const svgEl = graphRef.current
+    if (!svgEl) return
+    const nodes = referenceNodes.map((node) => ({ ...node }))
+    const nodeMap = Object.fromEntries(nodes.map((node) => [node.id, node])) as Record<string, RefNode>
+    const links: RefLink[] = nodes.filter((node) => node.parent).map((node) => ({ source: node.parent!, target: node.id }))
+    const svg = d3.select(svgEl)
+    svg.selectAll('*').remove()
+    const width = () => svgEl.clientWidth
+    const height = () => svgEl.clientHeight
+    const childrenByParent = nodes.reduce<Record<string, RefNode[]>>((acc, node) => {
+      if (!node.parent) return acc
+      acc[node.parent] ??= []
+      acc[node.parent].push(node)
+      return acc
+    }, {})
+    const rootNodes = nodes.filter((node) => node.level === 1)
+
+    const defs = svg.append('defs')
+    ;['glow3', 'glow6', 'glow10'].forEach((id, index) => {
+      const filter = defs.append('filter').attr('id', id).attr('x', '-80%').attr('y', '-80%').attr('width', '260%').attr('height', '260%')
+      filter.append('feGaussianBlur').attr('in', 'SourceGraphic').attr('stdDeviation', [3, 6, 10][index]).attr('result', 'blur')
+      const merge = filter.append('feMerge')
+      merge.append('feMergeNode').attr('in', 'blur')
+      merge.append('feMergeNode').attr('in', 'SourceGraphic')
+    })
+    ;['pulseHalo3', 'pulseHalo6', 'pulseHalo10'].forEach((id, index) => {
+      const dev = [5, 8, 12][index]
+      const filter = defs.append('filter').attr('id', id).attr('x', '-100%').attr('y', '-100%').attr('width', '320%').attr('height', '320%').attr('color-interpolation-filters', 'sRGB')
+      filter.append('feGaussianBlur').attr('in', 'SourceGraphic').attr('stdDeviation', dev).attr('result', 'blur')
+      filter.append('feMerge').append('feMergeNode').attr('in', 'blur')
+    })
+    const flowGlow = defs.append('filter').attr('id', 'flowGlow').attr('x', '-120%').attr('y', '-120%').attr('width', '340%').attr('height', '340%').attr('color-interpolation-filters', 'sRGB')
+    flowGlow.append('feGaussianBlur').attr('in', 'SourceGraphic').attr('stdDeviation', 3.2).attr('result', 'blur')
+    flowGlow.append('feMerge').append('feMergeNode').attr('in', 'blur')
+
+    const g = svg.append('g')
+    const linkG = g.append('g')
+    const flowG = g.append('g')
+    const nodeG = g.append('g')
+    const labelG = g.append('g')
+    const expanded = new Set<string>()
+    let previousGraphActiveRootId: string | null = null
+
+    function getL1(node: RefNode) {
+      if (node.level === 1) return node
+      if (node.level === 2) return node.parent ? nodeMap[node.parent] ?? null : null
+      if (node.level === 3) return node.parent ? nodeMap[nodeMap[node.parent]?.parent ?? ''] ?? null : null
+      return null
+    }
+    function clampSectorSpan(rootCount: number) {
+      const naturalStep = TAU / Math.max(rootCount, 1)
+      return Math.min(1.78, naturalStep * 0.88)
+    }
+    function distributeOffset(index: number, total: number) {
+      if (total <= 1) return 0
+      return (index / (total - 1) - 0.5) * 2
+    }
+    function nodeColor(node: RefNode) {
+      return getL1(node)?.color ?? node.color
+    }
+    function nodeBelongsToRoot(node: RefNode, rootId: string) {
+      return getL1(node)?.id === rootId
+    }
+    function getActiveRootId() {
+      const expandedRoots = rootNodes.filter((root) => expanded.has(root.id))
+      return expandedRoots.length === 1 ? expandedRoots[0].id : null
+    }
+    function nr(node: RefNode) {
+      return node.level === 1 ? 27 : node.level === 2 ? 16 : 9
+    }
+    function getVisible() {
+      const visibleNodes = nodes.filter((node) => {
+        if (node.level === 1) return true
+        if (node.level === 2) return !!node.parent && expanded.has(node.parent)
+        if (node.level === 3 && node.parent) {
+          const parent = nodeMap[node.parent]
+          return !!parent && !!parent.parent && expanded.has(parent.parent) && expanded.has(node.parent)
+        }
+        return false
+      })
+      const ids = new Set(visibleNodes.map((node) => node.id))
+      const visibleLinks = links.filter((link) => {
+        const source = typeof link.source === 'object' ? link.source.id : link.source
+        const target = typeof link.target === 'object' ? link.target.id : link.target
+        return ids.has(source) && ids.has(target)
+      })
+      return { visibleNodes, visibleLinks }
+    }
+    function placeLevel3Fan(child: RefNode, childX: number, childY: number, rootX: number, rootY: number, sectorSpan: number, level2SiblingCount: number, visibleIds: Set<string>) {
+      const level3Children = (childrenByParent[child.id] ?? []).filter((g) => visibleIds.has(g.id))
+      const l3Count = level3Children.length
+      if (l3Count === 0) return [] as { id: string; x: number; y: number }[]
+      const level3Orbit = 120 + Math.max(0, l3Count - 2) * 22 + Math.max(0, level2SiblingCount - 5) * 5
+      const branchAngle = Math.atan2(childY - rootY, childX - rootX)
+      const branchDirX = Math.cos(branchAngle)
+      const branchDirY = Math.sin(branchAngle)
+      const branchTanX = Math.cos(branchAngle + Math.PI / 2)
+      const branchTanY = Math.sin(branchAngle + Math.PI / 2)
+      const level3Span = Math.min(Math.PI * 0.95, Math.max(sectorSpan * 0.88, 0.52 + l3Count * 0.24))
+      let level3TangentLimit = Math.tan(level3Span / 2) * level3Orbit * 0.94
+      const l3Radius = 9
+      const minL3Gap = l3Radius * 2 + 38
+      if (l3Count > 1) level3TangentLimit = Math.max(level3TangentLimit, (minL3Gap * (l3Count - 1)) / 2)
+      return level3Children.map((grandchild, grandchildIndex) => {
+        const offset = distributeOffset(grandchildIndex, level3Children.length)
+        const branchSpread = level3TangentLimit * offset
+        return { id: grandchild.id, x: childX + branchDirX * level3Orbit + branchTanX * branchSpread, y: childY + branchDirY * level3Orbit + branchTanY * branchSpread }
+      })
+    }
+    function computeTargets(visibleNodes: RefNode[]) {
+      const targets = new Map<string, { x: number; y: number }>()
+      const visibleIds = new Set(visibleNodes.map((node) => node.id))
+      const centerX = width() / 2
+      const centerY = height() / 2
+      const rootOrbit = Math.max(210, Math.min(width(), height()) * 0.34)
+      const expandedRootCount = rootNodes.filter((r) => expanded.has(r.id)).length
+      const sectorSpan = clampSectorSpan(expandedRootCount > 0 ? expandedRootCount : rootNodes.length)
+      rootNodes.forEach((root, rootIndex) => {
+        const rootAngle = -Math.PI / 2 + (rootIndex / Math.max(rootNodes.length, 1)) * TAU
+        const rootX = centerX + Math.cos(rootAngle) * rootOrbit
+        const rootY = centerY + Math.sin(rootAngle) * rootOrbit
+        targets.set(root.id, { x: rootX, y: rootY })
+        const level2Children = (childrenByParent[root.id] ?? []).filter((child) => visibleIds.has(child.id))
+        const baseLevel2Orbit = 172 + Math.max(0, level2Children.length - 4) * 20
+        const rootDirX = Math.cos(rootAngle)
+        const rootDirY = Math.sin(rootAngle)
+        const rootTanX = Math.cos(rootAngle + Math.PI / 2)
+        const rootTanY = Math.sin(rootAngle + Math.PI / 2)
+        const level2TangentLimit = Math.tan(sectorSpan / 2) * baseLevel2Orbit * 0.96
+        level2Children.forEach((child, childIndex) => {
+          const level2Offset = distributeOffset(childIndex, level2Children.length)
+          const tangentSpread = level2TangentLimit * level2Offset
+          const childX = rootX + rootDirX * baseLevel2Orbit + rootTanX * tangentSpread
+          const childY = rootY + rootDirY * baseLevel2Orbit + rootTanY * tangentSpread
+          targets.set(child.id, { x: childX, y: childY })
+          for (const p of placeLevel3Fan(child, childX, childY, rootX, rootY, sectorSpan, level2Children.length, visibleIds)) {
+            targets.set(p.id, { x: p.x, y: p.y })
+          }
+        })
+      })
+      return targets
+    }
+
+    const simulation = d3.forceSimulation<RefNode>().velocityDecay(0.42)
+      .force('link', d3.forceLink<RefNode, RefLink>().id((d) => d.id).distance((d) => {
+        const source = typeof d.source === 'object' ? d.source : nodeMap[d.source]
+        if (!source) return 90
+        if (source.level === 1) return 155 + Math.max(0, (childrenByParent[source.id]?.length ?? 0) - 4) * 20
+        if (source.level === 2) return 118 + Math.max(0, (childrenByParent[source.id]?.length ?? 0) - 2) * 24
+        return 60
+      }).strength((d) => {
+        const source = typeof d.source === 'object' ? d.source : nodeMap[d.source]
+        return source?.level === 2 ? 0.68 : 0.9
+      }))
+      .force('charge', d3.forceManyBody<RefNode>().strength((d) => (d.level === 1 ? -320 : d.level === 2 ? -140 : -110)))
+      .force('collision', d3.forceCollide<RefNode>().radius((d) => nr(d) + (d.level === 1 ? 34 : d.level === 2 ? 28 : 30)).iterations(3))
+      .force('center', d3.forceCenter())
+
+    function syncGraphDom() {
+      linkG.selectAll<SVGLineElement, d3.SimulationLinkDatum<RefNode>>('line.edge').attr('x1', (d) => (d.source as RefNode).x ?? 0).attr('y1', (d) => (d.source as RefNode).y ?? 0).attr('x2', (d) => (d.target as RefNode).x ?? 0).attr('y2', (d) => (d.target as RefNode).y ?? 0)
+      flowG.selectAll<SVGLineElement, d3.SimulationLinkDatum<RefNode>>('line.edge-flow').attr('x1', (d) => (d.source as RefNode).x ?? 0).attr('y1', (d) => (d.source as RefNode).y ?? 0).attr('x2', (d) => (d.target as RefNode).x ?? 0).attr('y2', (d) => (d.target as RefNode).y ?? 0)
+      nodeG.selectAll<SVGGElement, RefNode>('g.nd').attr('transform', (d) => `translate(${d.x ?? 0},${d.y ?? 0})`)
+      labelG.selectAll<SVGTextElement, RefNode>('text.lbl').attr('x', (d) => d.x ?? 0).attr('y', (d) => d.y ?? 0)
+    }
+    simulation.on('tick', syncGraphDom)
+
+    function deselect() {
+      nodeG.selectAll<SVGGElement, RefNode>('g.nd').select<SVGCircleElement>('circle.nbody').attr('stroke-width', (d) => (d.level === 1 ? 2 : 1.5)).attr('stroke-opacity', 1).attr('fill', (d) => `${nodeColor(d)}20`).attr('filter', (d) => (d.level === 1 ? 'url(#glow6)' : 'url(#glow3)'))
+      setSelectedId(null)
+    }
+    function highlight(id: string) {
+      nodeG.selectAll<SVGGElement, RefNode>('g.nd').select<SVGCircleElement>('circle.nbody').attr('stroke-width', (d) => (d.id === id ? (d.level === 1 ? 3.6 : d.level === 2 ? 3.1 : 2.8) : d.level === 1 ? 2 : 1.5)).attr('stroke-opacity', (d) => (d.id === id ? 1 : 0.92)).attr('fill', (d) => (d.id === id ? `${nodeColor(d)}72` : `${nodeColor(d)}20`)).attr('filter', (d) => (d.id !== id ? (d.level === 1 ? 'url(#glow6)' : 'url(#glow3)') : d.level === 1 ? 'url(#glow10)' : 'url(#glow6)'))
+    }
+    function refreshPanel(node: RefNode) {
+      setSelectedId(node.id)
+      setPanelOpen(true)
+    }
+    function collapseAll(id: string) {
+      expanded.delete(id)
+      nodes.filter((node) => node.parent === id).forEach((node) => collapseAll(node.id))
+    }
+    function collapseOtherRoots(activeRootId: string) { rootNodes.forEach((root) => { if (root.id !== activeRootId) collapseAll(root.id) }) }
+    function collapseOtherLevel2Branches(activeLevel2Id: string, parentRootId: string | null) { if (!parentRootId) return; (childrenByParent[parentRootId] ?? []).forEach((child) => { if (child.id !== activeLevel2Id) collapseAll(child.id) }) }
+    function clickNode(node: RefNode) {
+      const hasKids = nodes.some((item) => item.parent === node.id)
+      if (hasKids) {
+        if (expanded.has(node.id)) collapseAll(node.id)
+        else {
+          const rootId = getL1(node)?.id
+          if (rootId) collapseOtherRoots(rootId)
+          if (node.level === 2) collapseOtherLevel2Branches(node.id, node.parent)
+          expanded.add(node.id)
+        }
+        update(false)
+      } else {
+        simulation.stop()
+        simulation.alpha(0)
+      }
+      highlight(node.id)
+      refreshPanel(node)
+    }
+    function update(initial: boolean) {
+      if (!initial) simulation.stop()
+      const { visibleNodes, visibleLinks } = getVisible()
+      const visibleIds = new Set(visibleNodes.map((n) => n.id))
+      const targets = computeTargets(visibleNodes)
+      const activeRootId = getActiveRootId()
+      const expandedRootCount = rootNodes.filter((r) => expanded.has(r.id)).length
+      const sectorSpanForTween = clampSectorSpan(expandedRootCount > 0 ? expandedRootCount : rootNodes.length)
+      const rootDimmingChanged = initial || activeRootId !== previousGraphActiveRootId
+      previousGraphActiveRootId = activeRootId
+
+      simulation.force('center', d3.forceCenter(width() / 2, height() / 2))
+      simulation.force('orbit-x', d3.forceX<RefNode>((d) => targets.get(d.id)?.x ?? width() / 2).strength((d) => (d.level === 1 ? 0.3 : d.level === 2 ? 0.76 : 0.68)))
+      simulation.force('orbit-y', d3.forceY<RefNode>((d) => targets.get(d.id)?.y ?? height() / 2).strength((d) => (d.level === 1 ? 0.3 : d.level === 2 ? 0.76 : 0.68)))
+
+      visibleNodes.forEach((node) => {
+        const target = targets.get(node.id)
+        if (!target) return
+        if (node.x === undefined || node.y === undefined || initial) {
+          if (initial) {
+            const jitter = node.level === 1 ? 18 : node.level === 2 ? 10 : 4
+            node.x = target.x + (Math.random() - 0.5) * jitter
+            node.y = target.y + (Math.random() - 0.5) * jitter
+          } else {
+            const p = node.parent ? nodeMap[node.parent] : null
+            node.x = p?.x != null && p?.y != null ? p.x : target.x
+            node.y = p?.x != null && p?.y != null ? p.y : target.y
+          }
+        }
+      })
+
+      const linkSelection = linkG.selectAll<SVGLineElement, RefLink>('line.edge').data(visibleLinks, (d) => `${typeof d.source === 'object' ? d.source.id : d.source}>${typeof d.target === 'object' ? d.target.id : d.target}`)
+      const enteredLinks = linkSelection.enter().append('line').attr('class', 'edge').style('stroke', (d) => nodeColor(typeof d.target === 'object' ? d.target : nodeMap[d.target])).style('stroke-opacity', 0.22).style('stroke-width', (d) => ((typeof d.source === 'object' ? d.source : nodeMap[d.source]).level === 1 ? 1.4 : 0.9)).style('stroke-linecap', 'round').style('stroke-dasharray', (d) => ((typeof d.source === 'object' ? d.source : nodeMap[d.source]).level === 1 ? '5,5' : '2,5')).style('opacity', 0).transition().duration(450).style('opacity', 1)
+      const activeLinkSelection = linkSelection.merge(enteredLinks)
+      linkSelection.exit().transition().duration(300).style('opacity', 0).remove()
+
+      const flowSelection = flowG.selectAll<SVGLineElement, RefLink>('line.edge-flow').data(visibleLinks, (d) => `${typeof d.source === 'object' ? d.source.id : d.source}>${typeof d.target === 'object' ? d.target.id : d.target}`)
+      flowSelection.enter().append('line').attr('class', 'edge-flow').style('stroke', (d) => nodeColor(typeof d.target === 'object' ? d.target : nodeMap[d.target])).style('stroke-linecap', 'round').style('stroke-opacity', 0).style('stroke-width', 0).style('pointer-events', 'none').style('mix-blend-mode', 'screen').attr('filter', 'url(#flowGlow)')
+      flowSelection.exit().transition().duration(220).style('stroke-opacity', 0).remove()
+
+      const nodeSelection = nodeG.selectAll<SVGGElement, RefNode>('g.nd').data(visibleNodes, (d) => d.id)
+      const entered = nodeSelection.enter().append('g').attr('class', 'nd').attr('transform', (d) => `translate(${d.x ?? width() / 2},${d.y ?? height() / 2})`).style('opacity', 0).style('cursor', 'pointer')
+        .on('click', (event, d) => { event.stopPropagation(); clickNode(d) })
+        .on('mouseover', (event, d) => {
+          const hasKids = nodes.some((item) => item.parent === d.id)
+          setHovered({ name: d.name, level: levelLabels[d.level], stationCount: d.stations.length, hint: hasKids ? (expanded.has(d.id) ? '↙ Click to collapse' : '↗ Click to expand') : '● Click for stations', x: event.clientX + 14, y: event.clientY - 10 })
+        })
+        .on('mousemove', (event) => setHovered((prev) => (prev ? { ...prev, x: event.clientX + 14, y: event.clientY - 10 } : prev)))
+        .on('mouseout', () => setHovered(null))
+
+      entered.append('circle').attr('class', 'gring-halo').attr('r', (d) => nr(d) * 1.56).attr('fill', (d) => nodeColor(d)).attr('fill-opacity', 0.2).attr('stroke', 'none').attr('opacity', 0).attr('pointer-events', 'none').attr('filter', (d) => (d.level === 1 ? 'url(#pulseHalo10)' : d.level === 2 ? 'url(#pulseHalo6)' : 'url(#pulseHalo3)'))
+      entered.append('circle').attr('class', 'gring-rim').attr('r', (d) => nr(d) * 1.9).attr('fill', 'none').attr('stroke', (d) => nodeColor(d)).attr('stroke-width', 0.32).attr('stroke-linecap', 'round').attr('stroke-opacity', 0.15).attr('opacity', 0).attr('pointer-events', 'none')
+      entered.filter((d) => d.level === 1).append('circle').attr('class', 'gring-mid-halo').attr('r', (d) => nr(d) * 1.14).attr('fill', (d) => nodeColor(d)).attr('fill-opacity', 0.22).attr('stroke', 'none').attr('opacity', 0).attr('pointer-events', 'none').attr('filter', 'url(#pulseHalo6)')
+      entered.filter((d) => d.level === 1).append('circle').attr('class', 'gring-mid-rim').attr('r', (d) => nr(d) * 1.35).attr('fill', 'none').attr('stroke', (d) => nodeColor(d)).attr('stroke-width', 0.28).attr('stroke-linecap', 'round').attr('stroke-opacity', 0.16).attr('opacity', 0).attr('pointer-events', 'none')
+      entered.append('circle').attr('class', 'nbody').attr('r', (d) => nr(d)).attr('fill', (d) => `${nodeColor(d)}20`).attr('stroke', (d) => nodeColor(d)).attr('stroke-width', (d) => (d.level === 1 ? 2 : 1.5)).attr('filter', (d) => (d.level === 1 ? 'url(#glow6)' : 'url(#glow3)'))
+      entered.filter((d) => d.level <= 2).append('circle').attr('class', 'ncore').attr('r', (d) => nr(d) * 0.38).attr('fill', (d) => nodeColor(d)).attr('filter', 'url(#glow3)')
+      entered.filter((d) => d.level === 1).each(function (d) {
+        const gg = d3.select(this)
+        const s = nr(d) * 0.75
+        gg.append('line').attr('x1', -s).attr('y1', 0).attr('x2', s).attr('y2', 0).attr('stroke', nodeColor(d)).attr('stroke-width', 0.8).attr('stroke-opacity', 0.55)
+        gg.append('line').attr('x1', 0).attr('y1', -s).attr('x2', 0).attr('y2', s).attr('stroke', nodeColor(d)).attr('stroke-width', 0.8).attr('stroke-opacity', 0.55)
+        gg.append('line').attr('x1', -s * 0.65).attr('y1', -s * 0.65).attr('x2', s * 0.65).attr('y2', s * 0.65).attr('stroke', nodeColor(d)).attr('stroke-width', 0.5).attr('stroke-opacity', 0.3)
+        gg.append('line').attr('x1', s * 0.65).attr('y1', -s * 0.65).attr('x2', -s * 0.65).attr('y2', s * 0.65).attr('stroke', nodeColor(d)).attr('stroke-width', 0.5).attr('stroke-opacity', 0.3)
+      })
+      entered.transition().duration(500).style('opacity', 1)
+      const activeNodeSelection = nodeSelection.merge(entered)
+
+      const labelSelection = labelG.selectAll<SVGTextElement, RefNode>('text.lbl').data(visibleNodes, (d) => d.id)
+      const enteredLabels = labelSelection.enter().append('text').attr('class', 'lbl').style('font-family', "'Cinzel', serif").style('font-size', (d) => (d.level === 1 ? '13px' : d.level === 2 ? '10px' : '9px')).style('font-weight', (d) => (d.level === 1 ? '600' : '400')).style('fill', (d) => (d.level === 1 ? nodeColor(d) : '#b8a888')).style('text-anchor', 'middle').style('pointer-events', 'none').style('letter-spacing', (d) => (d.level === 1 ? '.1em' : '.04em')).attr('dy', (d) => nr(d) + (d.level === 1 ? 20 : d.level === 2 ? 14 : 12)).text((d) => d.name).style('opacity', 0).transition().duration(500).style('opacity', 1)
+      const activeLabelSelection = labelSelection.merge(enteredLabels)
+      labelSelection.exit().transition().duration(300).style('opacity', 0).remove()
+      nodeSelection.exit().transition().duration(300).style('opacity', 0).remove()
+
+      const dimNodeOpacity = (d: RefNode) => !activeRootId ? 1 : nodeBelongsToRoot(d, activeRootId) ? 1 : d.level === 1 ? 0.34 : 0.12
+      const dimLabelOpacity = (d: RefNode) => !activeRootId ? 1 : nodeBelongsToRoot(d, activeRootId) ? 1 : d.level === 1 ? 0.42 : 0.14
+      const dimLinkOpacity = (d: RefLink) => {
+        if (!activeRootId) return 1
+        const source = typeof d.source === 'object' ? d.source : nodeMap[d.source]
+        const target = typeof d.target === 'object' ? d.target : nodeMap[d.target]
+        return nodeBelongsToRoot(source, activeRootId) && nodeBelongsToRoot(target, activeRootId) ? 1 : 0.1
+      }
+      if (rootDimmingChanged) {
+        activeNodeSelection.transition().duration(420).style('opacity', (d) => dimNodeOpacity(d))
+        activeLabelSelection.transition().duration(420).style('opacity', (d) => dimLabelOpacity(d))
+        activeLinkSelection.transition().duration(420).style('opacity', (d) => dimLinkOpacity(d))
+      } else {
+        activeNodeSelection.style('opacity', (d) => dimNodeOpacity(d))
+        activeLabelSelection.style('opacity', (d) => dimLabelOpacity(d))
+        activeLinkSelection.style('opacity', (d) => dimLinkOpacity(d))
+      }
+
+      simulation.nodes(visibleNodes)
+      simulation.force<d3.ForceLink<RefNode, RefLink>>('link')?.links(visibleLinks)
+
+      if (!initial) {
+        svg.interrupt('graphLayout')
+        function applyL3FromCurrentL2() {
+          rootNodes.forEach((root) => {
+            if (!visibleIds.has(root.id)) return
+            const rootX = root.x ?? targets.get(root.id)!.x
+            const rootY = root.y ?? targets.get(root.id)!.y
+            const level2Children = (childrenByParent[root.id] ?? []).filter((c) => visibleIds.has(c.id))
+            for (const child of level2Children) {
+              const cx = child.x ?? targets.get(child.id)!.x
+              const cy = child.y ?? targets.get(child.id)!.y
+              for (const p of placeLevel3Fan(child, cx, cy, rootX, rootY, sectorSpanForTween, level2Children.length, visibleIds)) {
+                const n = nodeMap[p.id]
+                n.x = p.x
+                n.y = p.y
+              }
+            }
+          })
+        }
+        applyL3FromCurrentL2()
+        syncGraphDom()
+        const startPos = new Map(visibleNodes.filter((d) => d.level <= 2).map((d) => [d.id, { x: d.x ?? targets.get(d.id)!.x, y: d.y ?? targets.get(d.id)!.y }] as const))
+        svg.transition('graphLayout').duration(440).ease(d3.easeLinear).tween('graphLayout', () => (u: number) => {
+          for (const d of visibleNodes) {
+            if (d.level === 3) continue
+            const tgt = targets.get(d.id)!
+            const s = startPos.get(d.id)!
+            d.x = s.x + (tgt.x - s.x) * u
+            d.y = s.y + (tgt.y - s.y) * u
+          }
+          applyL3FromCurrentL2()
+          syncGraphDom()
+        }).on('end', () => {
+          for (const d of visibleNodes) {
+            const tgt = targets.get(d.id)!
+            d.x = tgt.x
+            d.y = tgt.y
+            d.vx = 0
+            d.vy = 0
+          }
+          simulation.alpha(0)
+          syncGraphDom()
+        })
+      } else {
+        simulation.alpha(1).restart()
+      }
+
+      const focusTransform = !activeRootId
+        ? d3.zoomIdentity.translate(width() / 2, height() / 2).scale(1).translate(-width() / 2, -height() / 2)
+        : (() => {
+            const rootTarget = targets.get(activeRootId)
+            if (!rootTarget) return d3.zoomIdentity.translate(width() / 2, height() / 2).scale(1).translate(-width() / 2, -height() / 2)
+            return d3.zoomIdentity.translate(width() / 2, height() / 2).scale(1.18).translate(-rootTarget.x, -rootTarget.y)
+          })()
+      if (rootDimmingChanged) svg.transition().duration(initial ? 100 : 700).ease(d3.easeCubicOut).call(zoomBehavior.transform, focusTransform)
+    }
+
+    const zoomBehavior = d3.zoom<SVGSVGElement, unknown>().scaleExtent([0.2, 3.5]).on('zoom', (event) => {
+      let focusX = width() * 0.5
+      let focusY = height() * 0.5
+      const sourceEvent = event.sourceEvent as MouseEvent | WheelEvent | PointerEvent | undefined
+      if (sourceEvent && 'clientX' in sourceEvent && 'clientY' in sourceEvent) {
+        const rect = svgEl.getBoundingClientRect()
+        focusX = sourceEvent.clientX - rect.left
+        focusY = sourceEvent.clientY - rect.top
+      }
+      viewportRef.current = { x: event.transform.x, y: event.transform.y, k: event.transform.k, focusX, focusY }
+      g.attr('transform', event.transform.toString())
+    })
+
+    svg.call(zoomBehavior)
+    svg.on('click.bg', () => { setPanelOpen(false); deselect() })
+    update(true)
+    const timeout = window.setTimeout(() => {
+      svg.call(zoomBehavior.transform, d3.zoomIdentity.translate(width() / 2, height() / 2).scale(1).translate(-width() / 2, -height() / 2))
+    }, 100)
+    const onResize = () => {
+      simulation.force('center', d3.forceCenter(width() / 2, height() / 2))
+      simulation.alpha(0.1).restart()
+    }
+    window.addEventListener('resize', onResize)
+    return () => {
+      window.clearTimeout(timeout)
+      window.removeEventListener('resize', onResize)
+      simulation.stop()
+      svg.on('.zoom', null)
+      svg.on('click.bg', null)
+    }
+  }, [referenceNodes, viewportRef])
+
+  return { graphRef }
+}
