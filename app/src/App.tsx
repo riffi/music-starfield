@@ -59,6 +59,8 @@ const SOMAFM_CHANNELS: Record<string, string> = {
   bossa: 'bossa',
 }
 
+const PROXIED_STATIONS = new Set(['hearme-future-garage', 'hearme-vocal-chillout'])
+
 type SomaChannelsResponse = {
   channels?: {
     id: string
@@ -78,6 +80,15 @@ function buildWaveformPath(samples: number[], width: number, height: number) {
     const y = midY + (sample - 0.5) * amplitude * 2
     return `${path}${index === 0 ? 'M' : ' L'}${x.toFixed(2)} ${y.toFixed(2)}`
   }, '')
+}
+
+function resolvePlayableStreamUrl(stationId: string, streamUrl: string) {
+  if (!PROXIED_STATIONS.has(stationId)) return streamUrl
+  return `/api/stream-proxy?url=${encodeURIComponent(streamUrl)}`
+}
+
+function toAbsoluteUrl(url: string) {
+  return new URL(url, window.location.href).toString()
 }
 
 async function loadSoundparkDeepNowPlaying() {
@@ -874,8 +885,20 @@ function App() {
 
   async function playStation(station: (typeof panelStations)[number]) {
     if (!audioRef.current || !selectedNode) return
+    const playableUrl = resolvePlayableStreamUrl(station.id, station.streamUrl)
+    const currentAudioUrl = audioRef.current.currentSrc || audioRef.current.src
+    const hasStaleStreamUrl = currentAudioUrl && toAbsoluteUrl(playableUrl) !== currentAudioUrl
 
     if (currentStationId === station.id) {
+      if (hasStaleStreamUrl) {
+        setLoadingStationId(station.id)
+        setCurrentTrackTitle('')
+        const restarted = await startStream(playableUrl)
+        setPlaying(restarted)
+        setLoadingStationId(null)
+        return
+      }
+
       if (audioRef.current.paused) {
         setLoadingStationId(station.id)
         void ensureAudioAnalyser()
@@ -896,7 +919,7 @@ function App() {
     setCurrentGenre(selectedNode.name)
     setCurrentName(station.name)
     setCurrentTrackTitle('')
-    const started = await startStream(station.streamUrl)
+    const started = await startStream(playableUrl)
     setPlaying(started)
     setLoadingStationId(null)
   }
