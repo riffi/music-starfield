@@ -1,3 +1,5 @@
+import { PROXIED_STREAM_HOSTS } from '../../shared/streamProxyConfig.js'
+
 const SOMAFM_CHANNELS: Record<string, string> = {
   'drone-zone': 'dronezone',
   'deep-space-one': 'deepspaceone',
@@ -14,7 +16,7 @@ const SOMAFM_CHANNELS: Record<string, string> = {
   bossa: 'bossa',
 }
 
-const PROXIED_STATIONS = new Set(['hearme-future-garage', 'hearme-vocal-chillout', 'atmfm-breaks', 'ural-sound', 'puls-radio-trance', '90s-eurodance', 'liquid-dnb-station'])
+const PROXIED_STREAM_HOST_SET = new Set<string>(PROXIED_STREAM_HOSTS)
 
 export type SomaChannelsResponse = {
   channels?: {
@@ -59,8 +61,19 @@ export function computeSpectrumLevels(freqData: Uint8Array, barCount: number): n
   return levels
 }
 
+export function shouldProxyStream(_stationId: string, streamUrl: string) {
+  let parsedUrl: URL
+  try {
+    parsedUrl = new URL(streamUrl)
+  } catch {
+    return false
+  }
+
+  return parsedUrl.protocol === 'http:' || PROXIED_STREAM_HOST_SET.has(parsedUrl.hostname)
+}
+
 export function resolvePlayableStreamUrl(stationId: string, streamUrl: string) {
-  if (!PROXIED_STATIONS.has(stationId)) return streamUrl
+  if (!shouldProxyStream(stationId, streamUrl)) return streamUrl
   return `/api/stream-proxy?url=${encodeURIComponent(streamUrl)}`
 }
 

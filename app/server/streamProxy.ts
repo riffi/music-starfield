@@ -1,8 +1,9 @@
 import http from 'node:http'
 import https from 'node:https'
 import { URL } from 'node:url'
+import { PROXIED_STREAM_HOSTS } from '../shared/streamProxyConfig.js'
 
-const ALLOWED_STREAM_HOSTS = new Set(['radio.hearme.fm', 'station-sound.ru', '5.restream.one', 'icecast.pulsradio.com', 'listen1.myradio24.com', '95.47.244.172'])
+const ALLOWED_STREAM_HOSTS = new Set<string>(PROXIED_STREAM_HOSTS)
 
 type MiddlewareLikeRequest = http.IncomingMessage & { query?: Record<string, string | string[] | undefined> }
 
