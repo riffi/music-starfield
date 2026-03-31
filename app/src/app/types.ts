@@ -8,7 +8,7 @@ export type RefStation = {
 export type RefNode = {
   id: string
   name: string
-  level: 1 | 2 | 3
+  level: 1 | 2 | 3 | 4
   parent: string | null
   color: string
   stations: RefStation[]

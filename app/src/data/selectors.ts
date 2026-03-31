@@ -8,17 +8,10 @@ const STYLE_NAME_BY_ID = Object.fromEntries(styleTaxonomy.map((taxon) => [taxon.
 const ATLAS_PARENT_OVERRIDES: Record<string, string | undefined> = {
   breaks: BREAKBEAT_CLUSTER_ID,
   drumandbass: BREAKBEAT_CLUSTER_ID,
-  atmosphericbreaks: BREAKBEAT_CLUSTER_ID,
-  liquidfunk: BREAKBEAT_CLUSTER_ID,
   [BREAKBEAT_CLUSTER_ID]: 'electronic',
   house: CLUB_CLUSTER_ID,
   techno: CLUB_CLUSTER_ID,
-  deephouse: CLUB_CLUSTER_ID,
-  proghouse: CLUB_CLUSTER_ID,
-  techhouse: CLUB_CLUSTER_ID,
-  tropicalhouse: CLUB_CLUSTER_ID,
-  industrialtech: CLUB_CLUSTER_ID,
-  minimaltech: CLUB_CLUSTER_ID,
+  vocalchillout: 'chillout',
   [CLUB_CLUSTER_ID]: 'electronic',
 }
 

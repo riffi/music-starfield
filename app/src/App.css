@@ -181,6 +181,11 @@ border:1px solid rgba(148,188,255,.22);border-radius:50%;box-shadow:0 0 6px rgba
   stroke-width: 0.8px;
 }
 
+.lbl-l4 {
+  stroke: rgba(2,4,12,.22);
+  stroke-width: 0.7px;
+}
+
 @media (max-width: 900px) {
   #hdr { padding: 14px 18px; flex-direction: column; gap: 12px; }
   #panel { width: min(100vw, 336px); }

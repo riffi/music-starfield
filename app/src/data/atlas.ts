@@ -1,9 +1,9 @@
-import { rootColors, stationBindings, styleRelations, styleTaxonomy, type RelationKind } from './taxonomy'
+import { rootColors, stationBindings, styleTaxonomy, type RelationKind } from './taxonomy'
 
 export type AtlasNode = {
   id: string
   name: string
-  level: 1 | 2 | 3
+  level: 1 | 2 | 3 | 4
   parentId?: string
   color: string
 }
@@ -27,10 +27,12 @@ export type AtlasStation = {
 }
 
 const BREAKBEAT_CLUSTER_ID = 'breakbeat'
-const BREAKBEAT_CLUSTER_CHILDREN = new Set(['breaks', 'drumandbass', 'atmosphericbreaks', 'liquidfunk'])
+const BREAKBEAT_CLUSTER_CHILDREN = new Set(['breaks', 'drumandbass'])
 const CLUB_CLUSTER_ID = 'club'
-const CLUB_CLUSTER_CHILDREN = new Set(['house', 'techno', 'deephouse', 'proghouse', 'techhouse', 'tropicalhouse', 'industrialtech', 'minimaltech'])
-const ATLAS_OMIT_NODE_IDS = new Set(['house'])
+const CLUB_CLUSTER_CHILDREN = new Set(['house', 'techno'])
+const L4_PARENT_OVERRIDES: Partial<Record<(typeof styleTaxonomy)[number]['id'], string>> = {
+  vocalchillout: 'chillout',
+}
 
 const taxonomyById = Object.fromEntries(styleTaxonomy.map((taxon) => [taxon.id, taxon])) as Record<string, (typeof styleTaxonomy)[number]>
 const visibleIds = new Set(styleTaxonomy.filter((taxon) => taxon.isAtlasVisible).map((taxon) => taxon.id))
@@ -44,7 +46,7 @@ for (const taxon of styleTaxonomy) {
   }
 }
 
-const visibleTaxonomy = styleTaxonomy.filter((taxon) => visibleIds.has(taxon.id) && !ATLAS_OMIT_NODE_IDS.has(taxon.id))
+const visibleTaxonomy = styleTaxonomy.filter((taxon) => visibleIds.has(taxon.id))
 
 const nodes: AtlasNode[] = [
   {
@@ -61,37 +63,44 @@ const nodes: AtlasNode[] = [
     parentId: 'electronic',
     color: rootColors.electronic,
   },
-  ...visibleTaxonomy.map((taxon) => ({
-    id: taxon.id,
-    name: taxon.name,
-    level: BREAKBEAT_CLUSTER_CHILDREN.has(taxon.id) || CLUB_CLUSTER_CHILDREN.has(taxon.id) ? 3 : taxon.level,
-    parentId: BREAKBEAT_CLUSTER_CHILDREN.has(taxon.id)
-      ? BREAKBEAT_CLUSTER_ID
+  ...visibleTaxonomy.map((taxon) => {
+    const atlasParentId = L4_PARENT_OVERRIDES[taxon.id] ?? (
+      BREAKBEAT_CLUSTER_CHILDREN.has(taxon.id)
+        ? BREAKBEAT_CLUSTER_ID
+        : CLUB_CLUSTER_CHILDREN.has(taxon.id)
+          ? CLUB_CLUSTER_ID
+          : taxon.parentId
+    )
+    const level: AtlasNode['level'] = BREAKBEAT_CLUSTER_CHILDREN.has(taxon.id)
+      ? 3
+      : taxon.level === 3 && taxon.parentId && BREAKBEAT_CLUSTER_CHILDREN.has(taxon.parentId)
+        ? 4
       : CLUB_CLUSTER_CHILDREN.has(taxon.id)
-        ? CLUB_CLUSTER_ID
-        : taxon.parentId,
-    color: rootColors[taxon.root],
-  })),
+        ? 3
+        : taxon.level === 3 && taxon.parentId && CLUB_CLUSTER_CHILDREN.has(taxon.parentId)
+          ? 4
+          : L4_PARENT_OVERRIDES[taxon.id]
+            ? 4
+          : taxon.level
+
+    return {
+      id: taxon.id,
+      name: taxon.name,
+      level,
+      parentId: atlasParentId,
+      color: rootColors[taxon.root],
+    }
+  }),
 ]
 
-const links: AtlasLink[] = styleRelations
-  .filter((relation) => visibleIds.has(relation.sourceId) && visibleIds.has(relation.targetId))
-  .map((relation) => ({
-  id: relation.id,
-  sourceId: BREAKBEAT_CLUSTER_CHILDREN.has(relation.sourceId)
-    ? BREAKBEAT_CLUSTER_ID
-    : CLUB_CLUSTER_CHILDREN.has(relation.sourceId)
-      ? CLUB_CLUSTER_ID
-      : relation.sourceId,
-  targetId: BREAKBEAT_CLUSTER_CHILDREN.has(relation.targetId)
-    ? BREAKBEAT_CLUSTER_ID
-    : CLUB_CLUSTER_CHILDREN.has(relation.targetId)
-      ? CLUB_CLUSTER_ID
-      : relation.targetId,
-  relationType: relation.kind,
+const links: AtlasLink[] = nodes
+  .filter((node) => node.parentId)
+  .map((node) => ({
+    id: `${node.parentId}-parent-${node.id}`,
+    sourceId: node.parentId!,
+    targetId: node.id,
+    relationType: 'parent_of' as const,
   }))
-  .filter((relation) => relation.sourceId !== relation.targetId)
-  .filter((relation) => nodes.some((node) => node.id === relation.sourceId) && nodes.some((node) => node.id === relation.targetId))
 
 const stations: AtlasStation[] = stationBindings.map((binding) => ({
   id: binding.id,

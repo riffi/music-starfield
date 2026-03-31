@@ -23,6 +23,38 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
   const stationPulseIdsRef = useRef<Set<string>>(new Set())
   const flowEdgeKeysRef = useRef<Set<string>>(new Set())
 
+  function isLeafLevel(level: RefNode['level']) {
+    return level >= 3
+  }
+
+  function nodeRadius(level: RefNode['level'], rootRadius?: number) {
+    if (level === 1) return rootRadius ?? 27
+    if (level === 2) return 15
+    if (level === 3) return 6
+    return 4.6
+  }
+
+  function nodeStrokeWidth(level: RefNode['level']) {
+    if (level === 1) return 2
+    if (level === 2) return 1.5
+    if (level === 3) return 1.1
+    return 0.95
+  }
+
+  function nodeHighlightStrokeWidth(level: RefNode['level']) {
+    if (level === 1) return 3.6
+    if (level === 2) return 3.1
+    if (level === 3) return 2.2
+    return 1.8
+  }
+
+  function orbitStrength(level: RefNode['level']) {
+    if (level === 1) return 0.3
+    if (level === 2) return 0.76
+    if (level === 3) return 0.68
+    return 0.62
+  }
+
   function withAlpha(color: string, alpha: number) {
     const parsed = d3.color(color)
     if (!parsed) return color
@@ -51,7 +83,7 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
 
         d3.select(svgEl).selectAll<SVGGElement, RefNode>('g.nd').each(function (d, i) {
           const grp = d3.select(this)
-          const baseR = d.level === 1 ? 27 : d.level === 2 ? 16 : 9
+          const baseR = d.level === 1 ? 27 : d.level === 2 ? 16 : d.level === 3 ? 9 : 7
           const phase = i * 0.62
           const pulseThis = pulseIds.size > 0 && pulseIds.has(d.id)
 
@@ -63,24 +95,24 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
               grp.select('circle.gring-mid-rim').attr('opacity', 0)
             }
             if (d.level <= 2) grp.select('circle.ncore').attr('r', baseR * 0.38)
-            if (d.level === 3) {
+            if (isLeafLevel(d.level)) {
               grp.select('circle.nbody').attr('r', baseR)
-              grp.select('circle.ncold').attr('r', baseR * 0.42)
+              grp.select('circle.ncold').attr('r', baseR * (d.level === 3 ? 0.42 : 0.34))
             }
             return
           }
 
-          const ringFreq = d.level === 1 ? 0.42 : d.level === 2 ? 0.58 : 0.76
+          const ringFreq = d.level === 1 ? 0.42 : d.level === 2 ? 0.58 : d.level === 3 ? 0.76 : 0.88
           const ringWave = Math.abs(Math.sin(pt * ringFreq + phase))
-          const levelRingAmplitude = d.level === 1 ? 0.07 : d.level === 2 ? 0.16 : 0.15
-          const levelHaloBase = d.level === 1 ? 0.09 : d.level === 2 ? 0.13 : 0.12
-          const levelHaloWave = d.level === 1 ? 0.05 : d.level === 2 ? 0.11 : 0.1
-          const levelHaloAudio = d.level === 1 ? 0.18 : d.level === 2 ? 0.44 : 0.38
-          const levelHaloCap = d.level === 1 ? 0.24 : d.level === 2 ? 0.46 : 0.4
-          const levelRimBase = d.level === 1 ? 0.065 : d.level === 2 ? 0.09 : 0.082
-          const levelRimWave = d.level === 1 ? 0.03 : d.level === 2 ? 0.072 : 0.06
-          const levelRimAudio = d.level === 1 ? 0.075 : d.level === 2 ? 0.22 : 0.18
-          const levelRimCap = d.level === 1 ? 0.13 : d.level === 2 ? 0.28 : 0.24
+          const levelRingAmplitude = d.level === 1 ? 0.07 : d.level === 2 ? 0.16 : d.level === 3 ? 0.15 : 0.13
+          const levelHaloBase = d.level === 1 ? 0.09 : d.level === 2 ? 0.13 : d.level === 3 ? 0.12 : 0.1
+          const levelHaloWave = d.level === 1 ? 0.05 : d.level === 2 ? 0.11 : d.level === 3 ? 0.1 : 0.08
+          const levelHaloAudio = d.level === 1 ? 0.18 : d.level === 2 ? 0.44 : d.level === 3 ? 0.38 : 0.3
+          const levelHaloCap = d.level === 1 ? 0.24 : d.level === 2 ? 0.46 : d.level === 3 ? 0.4 : 0.32
+          const levelRimBase = d.level === 1 ? 0.065 : d.level === 2 ? 0.09 : d.level === 3 ? 0.082 : 0.07
+          const levelRimWave = d.level === 1 ? 0.03 : d.level === 2 ? 0.072 : d.level === 3 ? 0.06 : 0.05
+          const levelRimAudio = d.level === 1 ? 0.075 : d.level === 2 ? 0.22 : d.level === 3 ? 0.18 : 0.15
+          const levelRimCap = d.level === 1 ? 0.13 : d.level === 2 ? 0.28 : d.level === 3 ? 0.24 : 0.2
           const ringScale = (1 + ringWave * levelRingAmplitude) * audioRingBoost * branchPresenceBoost
           const haloFillOp = Math.min(levelHaloBase + ringWave * levelHaloWave + audioOpacityBoost * levelHaloAudio, levelHaloCap)
           const rimStrokeOp = Math.min(levelRimBase + ringWave * levelRimWave + audioOpacityBoost * levelRimAudio, levelRimCap)
@@ -101,10 +133,10 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
             grp.select('circle.ncore').attr('r', baseR * 0.38 * coreScale)
           }
 
-          if (d.level === 3) {
+          if (isLeafLevel(d.level)) {
             const bodyScale = 1 + Math.sin(pt * 1.02 + phase) * 0.18 + bass * 0.08 + energy * 0.1
             grp.select('circle.nbody').attr('r', baseR * bodyScale)
-            grp.select('circle.ncold').attr('r', baseR * 0.42 * (1 + energy * 0.08))
+            grp.select('circle.ncold').attr('r', baseR * (d.level === 3 ? 0.42 : 0.34) * (1 + energy * 0.08))
           }
         })
 
@@ -200,10 +232,11 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
     let previousGraphActiveLevel2Id: string | null = null
 
     function getL1(node: RefNode) {
-      if (node.level === 1) return node
-      if (node.level === 2) return node.parent ? nodeMap[node.parent] ?? null : null
-      if (node.level === 3) return node.parent ? nodeMap[nodeMap[node.parent]?.parent ?? ''] ?? null : null
-      return null
+      let cursor: RefNode | undefined = node
+      while (cursor && cursor.level !== 1 && cursor.parent) {
+        cursor = nodeMap[cursor.parent]
+      }
+      return cursor?.level === 1 ? cursor : null
     }
     function distributeOffset(index: number, total: number) {
       if (total <= 1) return 0
@@ -225,22 +258,27 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       return expandedLevel2.length === 1 ? expandedLevel2[0].id : null
     }
     function nr(node: RefNode) {
-      if (node.level === 1) return rootRadiusById.get(node.id) ?? 27
-      return node.level === 2 ? 15 : 6
+      return nodeRadius(node.level, rootRadiusById.get(node.id))
     }
     function level3ColdColor(node: RefNode) {
       const rootColor = getL1(node)?.color ?? '#a8cfff'
       return d3.interpolateRgb(rootColor, '#cfe2ff')(0.72)
     }
     function getVisible() {
+      function isVisibleBranch(node: RefNode) {
+        let cursor: RefNode | undefined = node
+        while (cursor && cursor.level > 1) {
+          if (!cursor.parent) return false
+          const parent: RefNode | undefined = nodeMap[cursor.parent]
+          if (!parent || !expanded.has(parent.id)) return false
+          cursor = parent
+        }
+        return true
+      }
+
       const visibleNodes = nodes.filter((node) => {
         if (node.level === 1) return true
-        if (node.level === 2) return !!node.parent && expanded.has(node.parent)
-        if (node.level === 3 && node.parent) {
-          const parent = nodeMap[node.parent]
-          return !!parent && !!parent.parent && expanded.has(parent.parent) && expanded.has(node.parent)
-        }
-        return false
+        return isVisibleBranch(node)
       })
       const ids = new Set(visibleNodes.map((node) => node.id))
       const visibleLinks = links.filter((link) => {
@@ -263,45 +301,51 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
 
       for (const [parentId, siblings] of Object.entries(childrenByParent)) {
         const parent = nodeMap[parentId]
-        if (!parent || parent.level !== 2 || !visibleIds.has(parent.id)) continue
-        const visibleLevel3 = siblings.filter((node) => visibleIds.has(node.id))
-        for (let i = 0; i < visibleLevel3.length - 1; i += 1) {
-          constellationLinks.push({ source: visibleLevel3[i].id, target: visibleLevel3[i + 1].id })
+        if (!parent || parent.level < 2 || !visibleIds.has(parent.id)) continue
+        const visibleChildren = siblings.filter((node) => visibleIds.has(node.id))
+        for (let i = 0; i < visibleChildren.length - 1; i += 1) {
+          constellationLinks.push({ source: visibleChildren[i].id, target: visibleChildren[i + 1].id })
         }
       }
 
       return constellationLinks
     }
-    function placeLevel3Fan(child: RefNode, childX: number, childY: number, rootX: number, rootY: number, sectorSpan: number, level2SiblingCount: number, visibleIds: Set<string>) {
-      const level3Children = (childrenByParent[child.id] ?? []).filter((g) => visibleIds.has(g.id))
-      const l3Count = level3Children.length
-      if (l3Count === 0) return [] as { id: string; x: number; y: number }[]
-      const rootDistance = Math.hypot(childX - rootX, childY - rootY)
-      const level3Orbit = Math.max(64, rootDistance * 0.38) + Math.max(0, l3Count - 2) * 10 + Math.max(0, level2SiblingCount - 5) * 2
-      const branchAngle = Math.atan2(childY - rootY, childX - rootX)
+    function placeChildFan(parent: RefNode, parentX: number, parentY: number, anchorX: number, anchorY: number, sectorSpan: number, siblingCount: number, visibleIds: Set<string>) {
+      const childNodes = (childrenByParent[parent.id] ?? []).filter((child) => visibleIds.has(child.id))
+      const childCount = childNodes.length
+      if (childCount === 0) return [] as { id: string; x: number; y: number }[]
+      const anchorDistance = Math.hypot(parentX - anchorX, parentY - anchorY)
+      const orbitBase = parent.level === 2 ? Math.max(74, anchorDistance * 0.44) : Math.max(58, anchorDistance * 0.46)
+      const pairOrbitBoost = childCount === 2 ? (parent.level === 2 ? 20 : 12) : 0
+      const childOrbit = orbitBase + pairOrbitBoost + Math.max(0, childCount - 2) * (parent.level === 2 ? 10 : 7) + Math.max(0, siblingCount - 4) * 2
+      const branchAngle = Math.atan2(parentY - anchorY, parentX - anchorX)
       const branchDirX = Math.cos(branchAngle)
       const branchDirY = Math.sin(branchAngle)
       const centerX = width() / 2
       const centerY = height() / 2
-      const outwardX = childX - centerX
-      const outwardY = childY - centerY
+      const outwardX = parentX - centerX
+      const outwardY = parentY - centerY
       const outwardAngle = Math.atan2(outwardY || branchDirY, outwardX || branchDirX)
       const outwardDirX = Math.cos(outwardAngle)
       const outwardDirY = Math.sin(outwardAngle)
       const outwardTanX = Math.cos(outwardAngle + Math.PI / 2)
       const outwardTanY = Math.sin(outwardAngle + Math.PI / 2)
-      const level3Span = Math.min(Math.PI * 0.72, Math.max(sectorSpan * 0.52, 0.34 + l3Count * 0.14))
-      let level3TangentLimit = Math.tan(level3Span / 2) * level3Orbit * 0.86
-      const l3Radius = 9
-      const minL3Gap = l3Radius * 2 + 40
-      if (l3Count > 1) level3TangentLimit = Math.max(level3TangentLimit, (minL3Gap * (l3Count - 1)) / 2)
-      return level3Children.map((grandchild, grandchildIndex) => {
-        const offset = l3Count === 1 ? 0 : l3Count === 2 ? grandchildIndex * 0.92 : distributeOffset(grandchildIndex, level3Children.length)
-        const branchSpread = l3Count === 2 ? level3TangentLimit * offset : level3TangentLimit * offset
+      const childSpan = Math.min(parent.level === 2 ? Math.PI * 0.78 : Math.PI * 0.58, Math.max(sectorSpan * (parent.level === 2 ? 0.58 : 0.48), 0.26 + childCount * 0.12))
+      let childTangentLimit = Math.tan(childSpan / 2) * childOrbit * (parent.level === 2 ? 0.86 : 0.8)
+      const childRadius = parent.level === 2 ? 9 : 7
+      const minGap = childRadius * 2 + (parent.level === 2 ? 52 : 32)
+      if (childCount > 1) childTangentLimit = Math.max(childTangentLimit, (minGap * (childCount - 1)) / 2)
+      return childNodes.map((child, childIndex) => {
+        const offset = childCount === 1
+          ? 0
+          : childCount === 2
+            ? childIndex === 0 ? -0.62 : 0.62
+            : distributeOffset(childIndex, childNodes.length)
+        const branchSpread = childTangentLimit * offset
         return {
-          id: grandchild.id,
-          x: childX + outwardDirX * level3Orbit + outwardTanX * branchSpread,
-          y: childY + outwardDirY * level3Orbit + outwardTanY * branchSpread,
+          id: child.id,
+          x: parentX + outwardDirX * childOrbit + outwardTanX * branchSpread,
+          y: parentY + outwardDirY * childOrbit + outwardTanY * branchSpread,
         }
       })
     }
@@ -322,8 +366,9 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
         const subtree = collectSubtree(root.id)
         const level2Count = subtree.filter((node) => node.level === 2).length
         const level3Count = subtree.filter((node) => node.level === 3).length
+        const level4Count = subtree.filter((node) => node.level === 4).length
         const stationFootprint = subtree.reduce((sum, node) => sum + Math.min(node.stations.length, node.level === 2 ? 3 : 2), 0)
-        const rawWeight = 1 + level2Count * 1.2 + level3Count * 1.75 + stationFootprint * 0.28
+        const rawWeight = 1 + level2Count * 1.2 + level3Count * 1.75 + level4Count * 1.1 + stationFootprint * 0.28
         return { id: root.id, weight: Math.sqrt(rawWeight) }
       })
       const minWeight = Math.min(...weights.map((entry) => entry.weight))
@@ -391,8 +436,12 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
           const childX = rootX + rootDirX * baseLevel2Orbit + rootTanX * tangentSpread
           const childY = rootY + rootDirY * baseLevel2Orbit + rootTanY * tangentSpread
           targets.set(child.id, { x: childX, y: childY })
-          for (const p of placeLevel3Fan(child, childX, childY, rootX, rootY, level2Span, level2Children.length, visibleIds)) {
+          for (const p of placeChildFan(child, childX, childY, rootX, rootY, level2Span, level2Children.length, visibleIds)) {
             targets.set(p.id, { x: p.x, y: p.y })
+            const grandchild = nodeMap[p.id]
+            for (const q of placeChildFan(grandchild, p.x, p.y, childX, childY, level2Span * 0.84, (childrenByParent[child.id] ?? []).length, visibleIds)) {
+              targets.set(q.id, { x: q.x, y: q.y })
+            }
           }
         })
       })
@@ -407,13 +456,16 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
         if (!source) return 90
         if (source.level === 1) return 155 + Math.max(0, (childrenByParent[source.id]?.length ?? 0) - 4) * 20
         if (source.level === 2) return 118 + Math.max(0, (childrenByParent[source.id]?.length ?? 0) - 2) * 24
-        return 60
+        if (source.level === 3) return 52 + Math.max(0, (childrenByParent[source.id]?.length ?? 0) - 2) * 16
+        return 44
       }).strength((d) => {
         const source = typeof d.source === 'object' ? d.source : nodeMap[d.source]
-        return source?.level === 2 ? 0.68 : 0.9
+        if (source?.level === 2) return 0.68
+        if (source?.level === 3) return 0.74
+        return 0.9
       }))
-      .force('charge', d3.forceManyBody<RefNode>().strength((d) => (d.level === 1 ? -320 : d.level === 2 ? -140 : -110)))
-      .force('collision', d3.forceCollide<RefNode>().radius((d) => nr(d) + (d.level === 1 ? 34 : d.level === 2 ? 28 : 30)).iterations(3))
+      .force('charge', d3.forceManyBody<RefNode>().strength((d) => (d.level === 1 ? -320 : d.level === 2 ? -140 : d.level === 3 ? -110 : -72)))
+      .force('collision', d3.forceCollide<RefNode>().radius((d) => nr(d) + (d.level === 1 ? 34 : d.level === 2 ? 28 : d.level === 3 ? 30 : 16)).iterations(3))
       .force('center', d3.forceCenter())
 
     function syncGraphDom() {
@@ -426,14 +478,14 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
     simulation.on('tick', syncGraphDom)
 
     function deselect() {
-      nodeG.selectAll<SVGGElement, RefNode>('g.nd').select<SVGCircleElement>('circle.nbody').attr('stroke-width', (d) => (d.level === 1 ? 2 : d.level === 2 ? 1.5 : 1.1)).attr('stroke-opacity', 1).attr('fill', (d) => (d.level === 3 ? withAlpha(level3ColdColor(d), 0.13) : withAlpha(nodeColor(d), 0.13))).attr('stroke', (d) => (d.level === 3 ? level3ColdColor(d) : nodeColor(d))).attr('filter', (d) => (d.level === 1 ? 'url(#glow6)' : 'url(#glow3)'))
+      nodeG.selectAll<SVGGElement, RefNode>('g.nd').select<SVGCircleElement>('circle.nbody').attr('stroke-width', (d) => nodeStrokeWidth(d.level)).attr('stroke-opacity', 1).attr('fill', (d) => (isLeafLevel(d.level) ? withAlpha(level3ColdColor(d), 0.13) : withAlpha(nodeColor(d), 0.13))).attr('stroke', (d) => (isLeafLevel(d.level) ? level3ColdColor(d) : nodeColor(d))).attr('filter', (d) => (d.level === 1 ? 'url(#glow6)' : 'url(#glow3)'))
       setSelectedId(null)
     }
     function highlight(id: string) {
-      nodeG.selectAll<SVGGElement, RefNode>('g.nd').select<SVGCircleElement>('circle.nbody').attr('stroke-width', (d) => (d.id === id ? (d.level === 1 ? 3.6 : d.level === 2 ? 3.1 : 2.2) : d.level === 1 ? 2 : d.level === 2 ? 1.5 : 1.1)).attr('stroke-opacity', (d) => (d.id === id ? 1 : 0.92)).attr('fill', (d) => {
-        if (d.level === 3) return d.id === id ? withAlpha(level3ColdColor(d), 0.31) : withAlpha(level3ColdColor(d), 0.13)
+      nodeG.selectAll<SVGGElement, RefNode>('g.nd').select<SVGCircleElement>('circle.nbody').attr('stroke-width', (d) => (d.id === id ? nodeHighlightStrokeWidth(d.level) : nodeStrokeWidth(d.level))).attr('stroke-opacity', (d) => (d.id === id ? 1 : 0.92)).attr('fill', (d) => {
+        if (isLeafLevel(d.level)) return d.id === id ? withAlpha(level3ColdColor(d), 0.31) : withAlpha(level3ColdColor(d), 0.13)
         return d.id === id ? withAlpha(nodeColor(d), 0.45) : withAlpha(nodeColor(d), 0.13)
-      }).attr('stroke', (d) => (d.level === 3 ? level3ColdColor(d) : nodeColor(d))).attr('filter', (d) => (d.id !== id ? (d.level === 1 ? 'url(#glow6)' : 'url(#glow3)') : d.level === 1 ? 'url(#glow10)' : 'url(#glow6)'))
+      }).attr('stroke', (d) => (isLeafLevel(d.level) ? level3ColdColor(d) : nodeColor(d))).attr('filter', (d) => (d.id !== id ? (d.level === 1 ? 'url(#glow6)' : 'url(#glow3)') : d.level === 1 ? 'url(#glow10)' : 'url(#glow6)'))
     }
     function refreshPanel(node: RefNode) {
       setSelectedId(node.id)
@@ -486,15 +538,15 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       }
 
       simulation.force('center', d3.forceCenter(width() / 2, height() / 2))
-      simulation.force('orbit-x', d3.forceX<RefNode>((d) => targets.get(d.id)?.x ?? width() / 2).strength((d) => (d.level === 1 ? 0.3 : d.level === 2 ? 0.76 : 0.68)))
-      simulation.force('orbit-y', d3.forceY<RefNode>((d) => targets.get(d.id)?.y ?? height() / 2).strength((d) => (d.level === 1 ? 0.3 : d.level === 2 ? 0.76 : 0.68)))
+      simulation.force('orbit-x', d3.forceX<RefNode>((d) => targets.get(d.id)?.x ?? width() / 2).strength((d) => orbitStrength(d.level)))
+      simulation.force('orbit-y', d3.forceY<RefNode>((d) => targets.get(d.id)?.y ?? height() / 2).strength((d) => orbitStrength(d.level)))
 
       visibleNodes.forEach((node) => {
         const target = targets.get(node.id)
         if (!target) return
         if (node.x === undefined || node.y === undefined || initial) {
           if (initial) {
-            const jitter = node.level === 1 ? 18 : node.level === 2 ? 10 : 4
+            const jitter = node.level === 1 ? 18 : node.level === 2 ? 10 : node.level === 3 ? 4 : 2.5
             node.x = target.x + (Math.random() - 0.5) * jitter
             node.y = target.y + (Math.random() - 0.5) * jitter
           } else {
@@ -546,11 +598,11 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       entered.append('circle').attr('class', 'gring-rim').attr('r', (d) => nr(d) * 1.9).attr('fill', 'none').attr('stroke', (d) => nodeColor(d)).attr('stroke-width', 0.32).attr('stroke-linecap', 'round').attr('stroke-opacity', 0.15).attr('opacity', 0).attr('pointer-events', 'none')
       entered.filter((d) => d.level === 1).append('circle').attr('class', 'gring-mid-halo').attr('r', (d) => nr(d) * 1.14).attr('fill', (d) => nodeColor(d)).attr('fill-opacity', 0.22).attr('stroke', 'none').attr('opacity', 0).attr('pointer-events', 'none').attr('filter', 'url(#pulseHalo6)')
       entered.filter((d) => d.level === 1).append('circle').attr('class', 'gring-mid-rim').attr('r', (d) => nr(d) * 1.35).attr('fill', 'none').attr('stroke', (d) => nodeColor(d)).attr('stroke-width', 0.28).attr('stroke-linecap', 'round').attr('stroke-opacity', 0.16).attr('opacity', 0).attr('pointer-events', 'none')
-      entered.append('circle').attr('class', 'nbody').attr('r', (d) => nr(d)).attr('fill', (d) => (d.level === 3 ? withAlpha(level3ColdColor(d), 0.13) : withAlpha(nodeColor(d), 0.13))).attr('stroke', (d) => (d.level === 3 ? level3ColdColor(d) : nodeColor(d))).attr('stroke-width', (d) => (d.level === 1 ? 2 : d.level === 2 ? 1.5 : 1.1)).attr('filter', (d) => (d.level === 1 ? 'url(#glow6)' : 'url(#glow3)'))
+      entered.append('circle').attr('class', 'nbody').attr('r', (d) => nr(d)).attr('fill', (d) => (isLeafLevel(d.level) ? withAlpha(level3ColdColor(d), 0.13) : withAlpha(nodeColor(d), 0.13))).attr('stroke', (d) => (isLeafLevel(d.level) ? level3ColdColor(d) : nodeColor(d))).attr('stroke-width', (d) => nodeStrokeWidth(d.level)).attr('filter', (d) => (d.level === 1 ? 'url(#glow6)' : 'url(#glow3)'))
       entered.filter((d) => d.level <= 2).append('circle').attr('class', 'ncore').attr('r', (d) => nr(d) * 0.38).attr('fill', (d) => nodeColor(d)).attr('filter', 'url(#glow3)')
       entered.filter((d) => d.level === 2).append('circle').attr('class', 'ncompanion-orbit').attr('r', (d) => nr(d) * 0.74).attr('fill', 'none').attr('stroke', (d) => nodeColor(d)).attr('stroke-opacity', 0.22).attr('stroke-width', 0.45).attr('stroke-dasharray', '1.4,2.4').attr('transform', 'rotate(-18)').attr('pointer-events', 'none')
       entered.filter((d) => d.level === 2).append('circle').attr('class', 'ncompanion').attr('cx', (d) => nr(d) * 0.52).attr('cy', (d) => -nr(d) * 0.24).attr('r', (d) => nr(d) * 0.22).attr('fill', (d) => d3.interpolateRgb(nodeColor(d), '#ffffff')(0.35)).attr('fill-opacity', 0.9).attr('filter', 'url(#glow3)').attr('pointer-events', 'none')
-      entered.filter((d) => d.level === 3).append('circle').attr('class', 'ncold').attr('r', (d) => nr(d) * 0.42).attr('fill', (d) => level3ColdColor(d)).attr('fill-opacity', 0.92).attr('filter', 'url(#glow3)').attr('pointer-events', 'none')
+      entered.filter((d) => isLeafLevel(d.level)).append('circle').attr('class', 'ncold').attr('r', (d) => nr(d) * (d.level === 3 ? 0.42 : 0.34)).attr('fill', (d) => level3ColdColor(d)).attr('fill-opacity', (d) => (d.level === 3 ? 0.92 : 0.8)).attr('filter', 'url(#glow3)').attr('pointer-events', 'none')
       entered.filter((d) => d.level === 1).each(function (d) {
         const gg = d3.select(this)
         const s = nr(d) * 0.75
@@ -563,7 +615,7 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       const activeNodeSelection = nodeSelection.merge(entered)
 
       const labelSelection = labelG.selectAll<SVGTextElement, RefNode>('text.lbl').data(visibleNodes, (d) => d.id)
-      const enteredLabels = labelSelection.enter().append('text').attr('class', (d) => `lbl lbl-l${d.level}`).style('font-family', "'Orbitron', sans-serif").style('font-size', (d) => (d.level === 1 ? '13px' : d.level === 2 ? '10px' : '9px')).style('font-weight', (d) => (d.level === 1 ? '600' : '500')).style('fill', (d) => (d.level === 1 ? nodeColor(d) : '#b8a888')).style('text-anchor', 'middle').style('pointer-events', 'none').style('letter-spacing', (d) => (d.level === 1 ? '.13em' : '.07em')).attr('dy', (d) => nr(d) + (d.level === 1 ? 20 : d.level === 2 ? 14 : 12)).text((d) => d.name).style('opacity', 0).transition().duration(500).style('opacity', 1)
+      const enteredLabels = labelSelection.enter().append('text').attr('class', (d) => `lbl lbl-l${d.level}`).style('font-family', "'Orbitron', sans-serif").style('font-size', (d) => (d.level === 1 ? '13px' : d.level === 2 ? '10px' : d.level === 3 ? '9px' : '8px')).style('font-weight', (d) => (d.level === 1 ? '600' : d.level === 4 ? '400' : '500')).style('fill', (d) => (d.level === 1 ? nodeColor(d) : d.level === 4 ? 'rgba(184,168,136,.82)' : '#b8a888')).style('text-anchor', 'middle').style('pointer-events', 'none').style('letter-spacing', (d) => (d.level === 1 ? '.13em' : d.level === 4 ? '.045em' : '.07em')).attr('dy', (d) => nr(d) + (d.level === 1 ? 20 : d.level === 2 ? 14 : d.level === 3 ? 12 : 10)).text((d) => d.name).style('opacity', 0).transition().duration(500).style('opacity', 1)
       const activeLabelSelection = labelSelection.merge(enteredLabels)
       labelSelection.exit().transition().duration(300).style('opacity', 0).remove()
       nodeSelection.exit().transition().duration(300).style('opacity', 0).remove()
@@ -599,7 +651,7 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
 
       if (!initial) {
         svg.interrupt('graphLayout')
-        function applyL3FromCurrentL2() {
+        function applyDescendantLayout() {
           rootNodes.forEach((root) => {
             if (!visibleIds.has(root.id)) return
             const rootMeta = rootLayout.get(root.id)
@@ -611,26 +663,31 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
             for (const child of level2Children) {
               const cx = child.x ?? targets.get(child.id)!.x
               const cy = child.y ?? targets.get(child.id)!.y
-              for (const p of placeLevel3Fan(child, cx, cy, rootX, rootY, level2Span, level2Children.length, visibleIds)) {
-                const n = nodeMap[p.id]
-                n.x = p.x
-                n.y = p.y
+              for (const p of placeChildFan(child, cx, cy, rootX, rootY, level2Span, level2Children.length, visibleIds)) {
+                const level3Node = nodeMap[p.id]
+                level3Node.x = p.x
+                level3Node.y = p.y
+                for (const q of placeChildFan(level3Node, p.x, p.y, cx, cy, level2Span * 0.84, (childrenByParent[child.id] ?? []).length, visibleIds)) {
+                  const level4Node = nodeMap[q.id]
+                  level4Node.x = q.x
+                  level4Node.y = q.y
+                }
               }
             }
           })
         }
-        applyL3FromCurrentL2()
+        applyDescendantLayout()
         syncGraphDom()
         const startPos = new Map(visibleNodes.filter((d) => d.level <= 2).map((d) => [d.id, { x: d.x ?? targets.get(d.id)!.x, y: d.y ?? targets.get(d.id)!.y }] as const))
         svg.transition('graphLayout').duration(440).ease(d3.easeLinear).tween('graphLayout', () => (u: number) => {
           for (const d of visibleNodes) {
-            if (d.level === 3) continue
+            if (d.level >= 3) continue
             const tgt = targets.get(d.id)!
             const s = startPos.get(d.id)!
             d.x = s.x + (tgt.x - s.x) * u
             d.y = s.y + (tgt.y - s.y) * u
           }
-          applyL3FromCurrentL2()
+          applyDescendantLayout()
           syncGraphDom()
         }).on('end', () => {
           for (const d of visibleNodes) {
