@@ -37,6 +37,7 @@ export function useAtlasGraph({
   const stationPulseIdsRef = useRef<Set<string>>(new Set())
   const flowEdgeKeysRef = useRef<Set<string>>(new Set())
   const expandedIdsRef = useRef<Set<string>>(new Set(expandedIds))
+  const pulseVisualsActiveRef = useRef(false)
 
   useEffect(() => {
     expandedIdsRef.current = new Set(expandedIds)
@@ -96,16 +97,72 @@ export function useAtlasGraph({
 
   useEffect(() => {
     let pt = 0
-    const tick = () => {
+    let lastVisualFrameAt = 0
+    const flowLengthCache = new WeakMap<SVGLineElement, number>()
+    const ACTIVE_VISUAL_FPS = 20
+
+    function resetPulseVisuals(svgEl: SVGSVGElement) {
+      d3.select(svgEl).selectAll<SVGGElement, RefNode>('g.nd').each(function (d) {
+        const grp = d3.select(this)
+        const baseR = d.level === 1 ? 27 : d.level === 2 ? 16 : d.level === 3 ? 9 : 7
+        grp.select('circle.gring-halo').attr('opacity', 0)
+        grp.select('circle.gring-rim').attr('opacity', 0)
+        if (d.level === 1) {
+          grp.select('circle.gring-mid-halo').attr('opacity', 0)
+          grp.select('circle.gring-mid-rim').attr('opacity', 0)
+        }
+        if (d.level <= 2) grp.select('circle.ncore').attr('r', baseR * 0.38)
+        if (isLeafLevel(d.level)) {
+          grp.select('circle.nbody').attr('r', baseR)
+          grp.select('circle.ncold').attr('r', baseR * (d.level === 3 ? 0.42 : 0.34))
+        }
+      })
+
+      d3.select(svgEl).selectAll<SVGLineElement, RefLink>('line.edge').each(function (d) {
+        const src = typeof d.source === 'object' ? d.source : null
+        if (!src) return
+        d3.select(this)
+          .style('stroke-dasharray', src.level === 1 ? '5,5' : '2,5')
+          .style('stroke-dashoffset', null)
+          .style('stroke-opacity', '0.22')
+          .style('stroke-width', String(src.level === 1 ? 1.4 : 0.9))
+      })
+
+      d3.select(svgEl).selectAll<SVGLineElement, RefLink>('line.edge-flow')
+        .style('stroke-dasharray', null)
+        .style('stroke-dashoffset', null)
+        .style('stroke-opacity', '0')
+        .style('stroke-width', '0')
+    }
+
+    const tick = (now = 0) => {
       pt += 0.014
       const svgEl = graphRef.current
       if (svgEl) {
         const { bass, energy } = audioDataRef.current
         const pulseIds = stationPulseIdsRef.current
         const pulseActive = pulseIds.size > 0
-        const audioRingBoost = 1 + bass * 0.34 + energy * 0.12
-        const audioOpacityBoost = bass * 0.18 + energy * 0.08
-        const branchPresenceBoost = pulseActive ? 1.015 : 1
+        const flowKeys = flowEdgeKeysRef.current
+        const flowActive = flowKeys.size > 0
+        const animateVisuals = pulseActive || flowActive
+
+        if (!animateVisuals) {
+          if (pulseVisualsActiveRef.current) {
+            resetPulseVisuals(svgEl)
+            pulseVisualsActiveRef.current = false
+          }
+          pulseFrameRef.current = requestAnimationFrame(tick)
+          return
+        }
+
+        if (lastVisualFrameAt && now - lastVisualFrameAt < 1000 / ACTIVE_VISUAL_FPS) {
+          pulseFrameRef.current = requestAnimationFrame(tick)
+          return
+        }
+
+        lastVisualFrameAt = now
+        pulseVisualsActiveRef.current = true
+        const audioOpacityBoost = bass * 0.12 + energy * 0.05
 
         d3.select(svgEl).selectAll<SVGGElement, RefNode>('g.nd').each(function (d, i) {
           const grp = d3.select(this)
@@ -130,44 +187,48 @@ export function useAtlasGraph({
 
           const ringFreq = d.level === 1 ? 0.42 : d.level === 2 ? 0.58 : d.level === 3 ? 0.76 : 0.88
           const ringWave = Math.abs(Math.sin(pt * ringFreq + phase))
-          const levelRingAmplitude = d.level === 1 ? 0.07 : d.level === 2 ? 0.16 : d.level === 3 ? 0.15 : 0.13
-          const levelHaloBase = d.level === 1 ? 0.09 : d.level === 2 ? 0.13 : d.level === 3 ? 0.12 : 0.1
-          const levelHaloWave = d.level === 1 ? 0.05 : d.level === 2 ? 0.11 : d.level === 3 ? 0.1 : 0.08
-          const levelHaloAudio = d.level === 1 ? 0.18 : d.level === 2 ? 0.44 : d.level === 3 ? 0.38 : 0.3
-          const levelHaloCap = d.level === 1 ? 0.24 : d.level === 2 ? 0.46 : d.level === 3 ? 0.4 : 0.32
-          const levelRimBase = d.level === 1 ? 0.065 : d.level === 2 ? 0.09 : d.level === 3 ? 0.082 : 0.07
-          const levelRimWave = d.level === 1 ? 0.03 : d.level === 2 ? 0.072 : d.level === 3 ? 0.06 : 0.05
-          const levelRimAudio = d.level === 1 ? 0.075 : d.level === 2 ? 0.22 : d.level === 3 ? 0.18 : 0.15
-          const levelRimCap = d.level === 1 ? 0.13 : d.level === 2 ? 0.28 : d.level === 3 ? 0.24 : 0.2
-          const ringScale = (1 + ringWave * levelRingAmplitude) * audioRingBoost * branchPresenceBoost
+          const levelHaloBase = d.level === 1 ? 0.16 : d.level === 2 ? 0.2 : d.level === 3 ? 0.16 : 0.14
+          const levelHaloWave = d.level === 1 ? 0.1 : d.level === 2 ? 0.14 : d.level === 3 ? 0.12 : 0.1
+          const levelHaloAudio = d.level === 1 ? 0.08 : d.level === 2 ? 0.14 : d.level === 3 ? 0.12 : 0.1
+          const levelHaloCap = d.level === 1 ? 0.3 : d.level === 2 ? 0.38 : d.level === 3 ? 0.3 : 0.26
+          const levelRimBase = d.level === 1 ? 0.18 : d.level === 2 ? 0.22 : d.level === 3 ? 0.18 : 0.16
+          const levelRimWave = d.level === 1 ? 0.12 : d.level === 2 ? 0.16 : d.level === 3 ? 0.14 : 0.12
+          const levelRimAudio = d.level === 1 ? 0.08 : d.level === 2 ? 0.12 : d.level === 3 ? 0.1 : 0.08
+          const levelRimCap = d.level === 1 ? 0.38 : d.level === 2 ? 0.48 : d.level === 3 ? 0.4 : 0.34
           const haloFillOp = Math.min(levelHaloBase + ringWave * levelHaloWave + audioOpacityBoost * levelHaloAudio, levelHaloCap)
           const rimStrokeOp = Math.min(levelRimBase + ringWave * levelRimWave + audioOpacityBoost * levelRimAudio, levelRimCap)
 
-          grp.select('circle.gring-halo').attr('opacity', 1).attr('r', baseR * 1.42 * ringScale).attr('fill-opacity', haloFillOp)
-          grp.select('circle.gring-rim').attr('opacity', 1).attr('r', baseR * 1.7 * ringScale).attr('stroke-opacity', rimStrokeOp)
+          grp.select('circle.gring-halo').attr('opacity', 1).attr('r', baseR * 1.42).attr('fill-opacity', haloFillOp)
+          grp.select('circle.gring-rim').attr('opacity', 1).attr('r', baseR * 1.68).attr('stroke-opacity', rimStrokeOp)
+
+          const bodyPulseStrokeWidth = nodeStrokeWidth(d.level) * (1.32 + ringWave * 0.82 + bass * 0.16)
+          const bodyPulseStrokeOpacity = Math.min(1, 0.9 + ringWave * 0.1)
+          const bodyPulseFillOpacity = d.level <= 2
+            ? Math.min(0.44, 0.18 + ringWave * 0.2 + energy * 0.08)
+            : Math.min(0.36, 0.14 + ringWave * 0.16 + energy * 0.06)
+          const pulseBodyColor = isLeafLevel(d.level) ? d3.interpolateRgb(d.color, '#cfe2ff')(0.72) : d.color
+          grp.select('circle.nbody')
+            .attr('stroke-width', bodyPulseStrokeWidth)
+            .attr('stroke-opacity', bodyPulseStrokeOpacity)
+            .attr('fill', withAlpha(pulseBodyColor, bodyPulseFillOpacity))
 
           if (d.level === 1) {
-            const midHalo = Math.min(haloFillOp * 0.98, 0.2)
-            const midRim = Math.min(rimStrokeOp * 1.02, 0.13)
-            grp.select('circle.gring-mid-halo').attr('opacity', 1).attr('r', baseR * 1.1 * ringScale).attr('fill-opacity', midHalo)
-            grp.select('circle.gring-mid-rim').attr('opacity', 1).attr('r', baseR * 1.28 * ringScale).attr('stroke-opacity', midRim)
+            grp.select('circle.gring-mid-halo').attr('opacity', 0)
+            grp.select('circle.gring-mid-rim').attr('opacity', 0)
           }
 
           if (d.level <= 2) {
-            const audioCore = 1 + bass * (d.level === 1 ? 0.17 : 0.34) + energy * (d.level === 1 ? 0.035 : 0.08)
-            const coreScale = (1 + Math.sin(pt * 1.62 + phase + Math.PI * 0.3) * (d.level === 1 ? 0.14 : 0.26)) * audioCore
-            grp.select('circle.ncore').attr('r', baseR * 0.38 * coreScale)
+            const coreScale = 1 + ringWave * (d.level === 1 ? 0.18 : 0.24) + bass * 0.08
+            grp.select('circle.ncore').attr('r', baseR * 0.38 * coreScale).attr('fill-opacity', 0.84 + ringWave * 0.16)
           }
 
           if (isLeafLevel(d.level)) {
-            const bodyScale = 1 + Math.sin(pt * 1.02 + phase) * 0.18 + bass * 0.08 + energy * 0.1
+            const bodyScale = 1 + ringWave * 0.14 + energy * 0.06
             grp.select('circle.nbody').attr('r', baseR * bodyScale)
-            grp.select('circle.ncold').attr('r', baseR * (d.level === 3 ? 0.42 : 0.34) * (1 + energy * 0.08))
+            grp.select('circle.ncold').attr('r', baseR * (d.level === 3 ? 0.42 : 0.34) * (1 + ringWave * 0.18)).attr('fill-opacity', d.level === 3 ? 0.84 + ringWave * 0.14 : 0.74 + ringWave * 0.12)
           }
         })
 
-        const flowKeys = flowEdgeKeysRef.current
-        const flowActive = flowKeys.size > 0
         d3.select(svgEl).selectAll<SVGLineElement, RefLink>('line.edge').each(function (d) {
           const src = typeof d.source === 'object' ? d.source : null
           const tgt = typeof d.target === 'object' ? d.target : null
@@ -188,13 +249,17 @@ export function useAtlasGraph({
           const line = d3.select(this)
           if (flowActive && flowKeys.has(key)) {
             const ln = this as SVGLineElement
-            const len = ln.getTotalLength() || 48
+            let len = flowLengthCache.get(ln)
+            if (!len) {
+              len = ln.getTotalLength() || 48
+              flowLengthCache.set(ln, len)
+            }
             const dashLen = Math.max(src.level === 1 ? 22 : 16, len * (src.level === 1 ? 0.18 : 0.14))
             const gapLen = Math.max(src.level === 1 ? 34 : 24, len * 0.9)
             const period = dashLen + gapLen
             const flowOff = (pt * (src.level === 1 ? 62 : 54)) % period
-            const flowOpacity = Math.min(0.92, 0.34 + bass * 0.34 + energy * 0.22)
-            const flowWidth = (src.level === 1 ? 2.6 : 1.8) + bass * 0.7 + energy * 0.3
+            const flowOpacity = Math.min(0.6, 0.24 + bass * 0.16 + energy * 0.12)
+            const flowWidth = src.level === 1 ? 1.9 : 1.4
             line.style('stroke-dasharray', `${dashLen} ${gapLen}`).style('stroke-dashoffset', String(-flowOff)).style('stroke-opacity', String(flowOpacity)).style('stroke-width', String(flowWidth))
           } else {
             line.style('stroke-dasharray', null).style('stroke-dashoffset', null).style('stroke-opacity', '0').style('stroke-width', '0')
@@ -510,11 +575,26 @@ export function useAtlasGraph({
       nodeG.selectAll<SVGGElement, RefNode>('g.nd').select<SVGCircleElement>('circle.nbody').attr('stroke-width', (d) => nodeStrokeWidth(d.level)).attr('stroke-opacity', 1).attr('fill', (d) => (isLeafLevel(d.level) ? withAlpha(level3ColdColor(d), 0.13) : withAlpha(nodeColor(d), 0.13))).attr('stroke', (d) => (isLeafLevel(d.level) ? level3ColdColor(d) : nodeColor(d))).attr('filter', (d) => (d.level === 1 ? 'url(#glow6)' : 'url(#glow3)'))
       setSelectedId(null)
     }
+    function selectedPathIds(id: string) {
+      const path = new Set<string>()
+      let cursor: string | null = id
+      while (cursor) {
+        path.add(cursor)
+        cursor = nodeMap[cursor]?.parent ?? null
+      }
+      return path
+    }
     function highlight(id: string) {
-      nodeG.selectAll<SVGGElement, RefNode>('g.nd').select<SVGCircleElement>('circle.nbody').attr('stroke-width', (d) => (d.id === id ? nodeHighlightStrokeWidth(d.level) : nodeStrokeWidth(d.level))).attr('stroke-opacity', (d) => (d.id === id ? 1 : 0.92)).attr('fill', (d) => {
-        if (isLeafLevel(d.level)) return d.id === id ? withAlpha(level3ColdColor(d), 0.31) : withAlpha(level3ColdColor(d), 0.13)
-        return d.id === id ? withAlpha(nodeColor(d), 0.45) : withAlpha(nodeColor(d), 0.13)
-      }).attr('stroke', (d) => (isLeafLevel(d.level) ? level3ColdColor(d) : nodeColor(d))).attr('filter', (d) => (d.id !== id ? (d.level === 1 ? 'url(#glow6)' : 'url(#glow3)') : d.level === 1 ? 'url(#glow10)' : 'url(#glow6)'))
+      const pathIds = selectedPathIds(id)
+      nodeG.selectAll<SVGGElement, RefNode>('g.nd').select<SVGCircleElement>('circle.nbody')
+        .attr('stroke-width', (d) => (d.id === id ? nodeHighlightStrokeWidth(d.level) : pathIds.has(d.id) ? nodeHighlightStrokeWidth(d.level) * 0.78 : nodeStrokeWidth(d.level)))
+        .attr('stroke-opacity', (d) => (d.id === id ? 1 : pathIds.has(d.id) ? 0.98 : 0.92))
+        .attr('fill', (d) => {
+          if (isLeafLevel(d.level)) return d.id === id ? withAlpha(level3ColdColor(d), 0.31) : pathIds.has(d.id) ? withAlpha(level3ColdColor(d), 0.2) : withAlpha(level3ColdColor(d), 0.13)
+          return d.id === id ? withAlpha(nodeColor(d), 0.45) : pathIds.has(d.id) ? withAlpha(nodeColor(d), 0.24) : withAlpha(nodeColor(d), 0.13)
+        })
+        .attr('stroke', (d) => (isLeafLevel(d.level) ? level3ColdColor(d) : nodeColor(d)))
+        .attr('filter', (d) => (d.id === id ? (d.level === 1 ? 'url(#glow10)' : 'url(#glow6)') : pathIds.has(d.id) ? 'url(#glow6)' : d.level === 1 ? 'url(#glow6)' : 'url(#glow3)'))
     }
     function refreshPanel(node: RefNode) {
       setSelectedId(node.id)
@@ -532,6 +612,7 @@ export function useAtlasGraph({
       })
     }
     function clickNode(node: RefNode) {
+      setHovered(null)
       const hasKids = nodes.some((item) => item.parent === node.id)
       const rootId = node.level === 1 ? node.id : getL1(node)?.id
       const shouldCollapseOtherRoots = !!rootId && (node.level === 1 || hasKids)
@@ -558,12 +639,19 @@ export function useAtlasGraph({
     }
     function update(initial: boolean, reason: 'layout' | 'resize' = 'layout') {
       if (!initial) simulation.stop()
+      svg.interrupt()
+      g.interrupt()
+      constellationG.interrupt()
+      linkG.interrupt()
+      flowG.interrupt()
+      nodeG.interrupt()
+      labelG.interrupt()
       const { visibleNodes, visibleLinks } = getVisible()
       const constellationLinks = buildConstellationLinks(visibleNodes)
       const visibleIds = new Set(visibleNodes.map((n) => n.id))
       const activeRootId = getActiveRootId()
       const activeLevel2Id = getActiveLevel2Id(activeRootId)
-      const { targets, rootLayout } = computeTargets(visibleNodes, activeRootId)
+      const { targets } = computeTargets(visibleNodes, activeRootId)
       const focusTargetChanged = initial || activeRootId !== previousGraphActiveRootId || activeLevel2Id !== previousGraphActiveLevel2Id
       const rootDimmingChanged = initial || activeRootId !== previousGraphActiveRootId
       previousGraphActiveRootId = activeRootId
@@ -704,58 +792,7 @@ export function useAtlasGraph({
       simulation.nodes(visibleNodes)
       simulation.force<d3.ForceLink<RefNode, RefLink>>('link')?.links(visibleLinks)
 
-      if (!initial && reason !== 'resize') {
-        svg.interrupt('graphLayout')
-        function applyDescendantLayout() {
-          rootNodes.forEach((root) => {
-            if (!visibleIds.has(root.id)) return
-            const rootMeta = rootLayout.get(root.id)
-            if (!rootMeta) return
-            const rootX = root.x ?? targets.get(root.id)!.x
-            const rootY = root.y ?? targets.get(root.id)!.y
-            const level2Children = (childrenByParent[root.id] ?? []).filter((c) => visibleIds.has(c.id))
-            const level2Span = computeLevel2Span(rootMeta.span, level2Children.length, activeRootId === root.id)
-            for (const child of level2Children) {
-              const cx = child.x ?? targets.get(child.id)!.x
-              const cy = child.y ?? targets.get(child.id)!.y
-              for (const p of placeChildFan(child, cx, cy, rootX, rootY, level2Span, level2Children.length, visibleIds)) {
-                const level3Node = nodeMap[p.id]
-                level3Node.x = p.x
-                level3Node.y = p.y
-                for (const q of placeChildFan(level3Node, p.x, p.y, cx, cy, level2Span * 0.84, (childrenByParent[child.id] ?? []).length, visibleIds)) {
-                  const level4Node = nodeMap[q.id]
-                  level4Node.x = q.x
-                  level4Node.y = q.y
-                }
-              }
-            }
-          })
-        }
-        applyDescendantLayout()
-        syncGraphDom()
-        const startPos = new Map(visibleNodes.filter((d) => d.level <= 2).map((d) => [d.id, { x: d.x ?? targets.get(d.id)!.x, y: d.y ?? targets.get(d.id)!.y }] as const))
-        svg.transition('graphLayout').duration(440).ease(d3.easeLinear).tween('graphLayout', () => (u: number) => {
-          for (const d of visibleNodes) {
-            if (d.level >= 3) continue
-            const tgt = targets.get(d.id)!
-            const s = startPos.get(d.id)!
-            d.x = s.x + (tgt.x - s.x) * u
-            d.y = s.y + (tgt.y - s.y) * u
-          }
-          applyDescendantLayout()
-          syncGraphDom()
-        }).on('end', () => {
-          for (const d of visibleNodes) {
-            const tgt = targets.get(d.id)!
-            d.x = tgt.x
-            d.y = tgt.y
-            d.vx = 0
-            d.vy = 0
-          }
-          simulation.alpha(0)
-          syncGraphDom()
-        })
-      } else if (!initial) {
+      if (!initial) {
         for (const d of visibleNodes) {
           const tgt = targets.get(d.id)
           if (!tgt) continue
@@ -782,7 +819,13 @@ export function useAtlasGraph({
             return d3.zoomIdentity.translate(width() / 2, height() / 2).scale(1.18).translate(-rootTarget.x, -rootTarget.y)
           })()
       if (focusTargetChanged || reason === 'resize') {
-        svg.transition().duration(initial ? 100 : reason === 'resize' ? 220 : 700).ease(d3.easeCubicOut).call(zoomBehavior.transform, focusTransform)
+        if (initial) {
+          svg.transition().duration(100).ease(d3.easeCubicOut).call(zoomBehavior.transform, focusTransform)
+        } else if (reason === 'resize') {
+          svg.transition().duration(220).ease(d3.easeCubicOut).call(zoomBehavior.transform, focusTransform)
+        } else {
+          svg.call(zoomBehavior.transform, focusTransform)
+        }
       }
     }
 

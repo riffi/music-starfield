@@ -42,6 +42,8 @@ export function useRadioPlayer({
   const normalizationEnabledRef = useRef(initialNormalizationEnabled)
   const normalizationAggressionRef = useRef(initialNormalizationAggression)
   const waveformFrameRef = useRef<number | null>(null)
+  const lastSpectrumCommitRef = useRef(0)
+  const spectrumLevelsRef = useRef<number[] | null>(null)
 
   const [currentStationId, setCurrentStationId] = useState<string | null>(null)
   const [loadingStationId, setLoadingStationId] = useState<string | null>(null)
@@ -273,6 +275,8 @@ export function useRadioPlayer({
 
   useEffect(() => {
     if (!playing || !analyserRef.current || !meterAnalyserRef.current) {
+      spectrumLevelsRef.current = null
+      lastSpectrumCommitRef.current = 0
       setSpectrumLevels(null)
       if (waveformFrameRef.current) cancelAnimationFrame(waveformFrameRef.current)
       waveformFrameRef.current = null
@@ -283,11 +287,28 @@ export function useRadioPlayer({
     const meterAnalyser = meterAnalyserRef.current
     const freqData = new Uint8Array(analyser.frequencyBinCount)
     const waveformData = new Uint8Array(meterAnalyser.fftSize)
+    const SPECTRUM_COMMIT_MS = 1000 / 18
+
+    function spectrumChanged(nextLevels: number[] | null, prevLevels: number[] | null) {
+      if (nextLevels === null || prevLevels === null) return nextLevels !== prevLevels
+      if (nextLevels.length !== prevLevels.length) return true
+      for (let i = 0; i < nextLevels.length; i += 1) {
+        if (Math.abs(nextLevels[i] - prevLevels[i]) > 0.025) return true
+      }
+      return false
+    }
+
     const tick = () => {
       fillAnalyserFrequency(analyser, freqData)
       const levels = computeSpectrumLevels(freqData, SPECTRUM_BAR_COUNT)
       const maxLevel = Math.max(...levels)
-      setSpectrumLevels(maxLevel > 0.02 ? levels : null)
+      const nextLevels = maxLevel > 0.02 ? levels : null
+      const now = performance.now()
+      if (now - lastSpectrumCommitRef.current >= SPECTRUM_COMMIT_MS && spectrumChanged(nextLevels, spectrumLevelsRef.current)) {
+        spectrumLevelsRef.current = nextLevels
+        lastSpectrumCommitRef.current = now
+        setSpectrumLevels(nextLevels)
+      }
 
       const autoGain = autoGainRef.current
       const audioContext = audioContextRef.current

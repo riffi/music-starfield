@@ -1,4 +1,6 @@
-export function AppHeader() {
+import { memo } from 'react'
+
+export const AppHeader = memo(function AppHeader() {
   return (
     <div id="hdr">
       <div className="hdr-center">
@@ -15,4 +17,4 @@ export function AppHeader() {
       </div>
     </div>
   )
-}
+})

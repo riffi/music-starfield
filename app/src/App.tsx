@@ -5,7 +5,6 @@ import { HoverTooltip } from './components/HoverTooltip'
 import { PlayerBar } from './components/PlayerBar'
 import { SidePanel } from './components/SidePanel'
 import { StaticOverlays } from './components/StaticOverlays'
-import { readPersistedAppState, writePersistedAppState } from './app/persistedState'
 import type { HoveredNode, RefNode } from './app/types'
 import { atlasData } from './data/atlas'
 import { stationMatchesNode } from './data/selectors'
@@ -14,7 +13,6 @@ import { useRadioPlayer } from './hooks/useRadioPlayer'
 import { useStarfield } from './hooks/useStarfield'
 
 function App() {
-  const persistedState = useMemo(() => readPersistedAppState(), [])
   const starfieldRef = useRef<HTMLCanvasElement | null>(null)
   const orreryRef = useRef<SVGCircleElement | null>(null)
   const viewportRef = useRef({
@@ -30,9 +28,9 @@ function App() {
     activeRootGlow: 0,
   })
   const audioDataRef = useRef({ bass: 0, energy: 0 })
-  const [selectedId, setSelectedId] = useState<string | null>(persistedState.graph.selectedNodeId)
-  const [panelOpen, setPanelOpen] = useState(persistedState.graph.panelOpen)
-  const [expandedIds, setExpandedIds] = useState<string[]>(persistedState.graph.expandedNodeIds)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [panelOpen, setPanelOpen] = useState(false)
+  const [expandedIds, setExpandedIds] = useState<string[]>([])
   const [hovered, setHovered] = useState<HoveredNode | null>(null)
 
   const referenceNodes = useMemo<RefNode[]>(() => {
@@ -61,8 +59,8 @@ function App() {
 
   const player = useRadioPlayer({
     selectedNode,
-    initialNormalizationEnabled: persistedState.audio.normalizationEnabled,
-    initialNormalizationAggression: persistedState.audio.normalizationAggression,
+    initialNormalizationEnabled: false,
+    initialNormalizationAggression: 55,
   })
 
   const graph = useAtlasGraph({
@@ -78,27 +76,6 @@ function App() {
     setPanelOpen,
     setHovered,
   })
-
-  useEffect(() => {
-    writePersistedAppState({
-      version: 1,
-      audio: {
-        normalizationEnabled: player.normalizationEnabled,
-        normalizationAggression: player.normalizationAggression,
-      },
-      graph: {
-        selectedNodeId: selectedId,
-        panelOpen: panelOpen && !!selectedId,
-        expandedNodeIds: expandedIds,
-      },
-    })
-  }, [
-    expandedIds,
-    panelOpen,
-    player.normalizationAggression,
-    player.normalizationEnabled,
-    selectedId,
-  ])
 
   useStarfield({
     canvasRef: starfieldRef,

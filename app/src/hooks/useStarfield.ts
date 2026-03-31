@@ -50,6 +50,10 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
     let nextShootAt = 0
     let t = 0
     let freqData: Uint8Array | null = null
+    let lastDrawAt = 0
+
+    const ACTIVE_FPS = 24
+    const IDLE_FPS = 30
 
     function resize() {
       width = canvasEl.width = window.innerWidth
@@ -62,7 +66,7 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
       shootingStars = []
       nextShootAt = 4
 
-      for (let i = 0; i < 5; i += 1) {
+      for (let i = 0; i < 3; i += 1) {
         nebulae.push({
           x: Math.random() * width,
           y: Math.random() * height,
@@ -73,7 +77,7 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
         })
       }
 
-      for (let i = 0; i < 360; i += 1) {
+      for (let i = 0; i < 180; i += 1) {
         const depth = Math.random() * 1.2 + 0.35
         const angle = Math.random() * Math.PI * 2
         const maxSpawnRadius = Math.sqrt(width * width + height * height) * (0.38 + depth * 0.16)
@@ -86,7 +90,7 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
           ph: Math.random() * Math.PI * 2,
           col: Math.random() > 0.88 ? '255,224,170' : Math.random() > 0.58 ? '170,185,255' : '235,238,255',
           depth,
-          glow: Math.random() > 0.9 ? Math.random() * 12 + 10 : 0,
+          glow: Math.random() > 0.96 ? Math.random() * 8 + 6 : 0,
         })
       }
     }
@@ -189,7 +193,7 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
       star.y = height * 0.5 + Math.sin(angle) * spawnRadius
     }
 
-    function drawFlightStars(audioBass: number, audioEnergy: number) {
+    function drawFlightStars(audioBass: number, audioEnergy: number, audioReactive: boolean) {
       const focusX = viewportRef.current.focusX || width * 0.5
       const focusY = viewportRef.current.focusY || height * 0.5
       const maxRadius = Math.max(width, height) * 0.72
@@ -200,7 +204,7 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
         const ux = dx / dist
         const uy = dy / dist
         const edgeBoost = Math.min(1.25, dist / maxRadius)
-        const flightSpeed = 0.052 + star.depth * 0.082 + edgeBoost * 0.14 + audioEnergy * 0.016 + audioBass * 0.012
+        const flightSpeed = 0.052 + star.depth * 0.082 + edgeBoost * 0.14 + (audioReactive ? audioEnergy * 0.01 + audioBass * 0.008 : 0)
         star.x += ux * flightSpeed
         star.y += uy * flightSpeed
 
@@ -221,7 +225,7 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
         const tailX = sx - ux * streakLength
         const tailY = sy - uy * streakLength
 
-        if (star.glow > 0) {
+        if (!audioReactive && star.glow > 0) {
           const glowR = star.glow * (0.88 + 0.08 * tw)
           const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowR)
           glow.addColorStop(0, `rgba(${star.col},${opacity * 0.22})`)
@@ -251,7 +255,12 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
       }
     }
 
-    function drawShootingStars() {
+    function drawShootingStars(enabled: boolean) {
+      if (!enabled) {
+        shootingStars = []
+        return
+      }
+
       if (shootingStars.length < 2 && t > nextShootAt) {
         const fromTop = Math.random() > 0.42
         const sx = fromTop ? Math.random() * width * 0.9 : Math.random() < 0.5 ? -10 : width + 10
@@ -307,7 +316,15 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
       }
     }
 
-    function draw() {
+    function draw(now = 0) {
+      const audioReactive = !!analyserRef.current
+      const frameInterval = 1000 / (audioReactive ? ACTIVE_FPS : IDLE_FPS)
+      if (lastDrawAt && now - lastDrawAt < frameInterval) {
+        frameId = requestAnimationFrame(draw)
+        return
+      }
+      lastDrawAt = now
+
       ctx.clearRect(0, 0, width, height)
       t += 0.008
 
@@ -336,12 +353,14 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
       audioBass = audioDataRef.current.bass
       audioEnergy = audioDataRef.current.energy
 
-      drawBackgroundGradient(audioEnergy)
+      drawBackgroundGradient(audioReactive ? Math.min(audioEnergy, 0.18) : audioEnergy)
       drawMilkyWay()
-      drawAmbientNebulae(audioBass, audioEnergy)
-      drawActiveRootNebula(audioBass, audioEnergy)
-      drawFlightStars(audioBass, audioEnergy)
-      drawShootingStars()
+      if (!audioReactive) {
+        drawAmbientNebulae(audioBass, audioEnergy)
+        drawActiveRootNebula(audioBass, audioEnergy)
+      }
+      drawFlightStars(audioBass, audioEnergy, audioReactive)
+      drawShootingStars(!audioReactive)
 
       frameId = requestAnimationFrame(draw)
     }

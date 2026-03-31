@@ -23,12 +23,37 @@ function walkStyleAncestors(seed: string | undefined, into: Set<string>) {
   }
 }
 
+function orderedStylePathToRoot(seed: string | undefined) {
+  const chain: string[] = []
+  let id = seed
+  while (id) {
+    chain.push(id)
+    id = ATLAS_PARENT_OVERRIDES[id] ?? STYLE_PARENT_BY_ID[id]
+  }
+  return chain
+}
+
 export function stationMatchesNode(station: AtlasStation, nodeId: string) {
   const matchedIds = new Set<string>()
   walkStyleAncestors(station.primaryStyleId, matchedIds)
   for (const sid of station.secondaryStyleIds) walkStyleAncestors(sid, matchedIds)
   for (const did of station.descriptorIds) walkStyleAncestors(did, matchedIds)
   return matchedIds.has(nodeId)
+}
+
+function stationContextPath(station: AtlasStation, selectedNodeId: string | null) {
+  if (selectedNodeId) {
+    const selectedPath = orderedStylePathToRoot(selectedNodeId)
+    if (selectedPath.length) return selectedPath
+  }
+
+  const primaryPath = orderedStylePathToRoot(station.primaryStyleId)
+  if (primaryPath.length) return primaryPath
+
+  const secondaryPath = station.secondaryStyleIds.flatMap((sid) => orderedStylePathToRoot(sid))
+  if (secondaryPath.length) return secondaryPath
+
+  return station.descriptorIds.flatMap((did) => orderedStylePathToRoot(did))
 }
 
 /**
@@ -40,14 +65,9 @@ export function pulseNodeIdsForPlayingStation(station: AtlasStation | undefined,
   const next = new Set<string>()
   if (!station) return next
 
-  if (selectedNodeId && stationMatchesNode(station, selectedNodeId)) {
-    walkStyleAncestors(selectedNodeId, next)
-    return next
+  for (const id of stationContextPath(station, selectedNodeId && stationMatchesNode(station, selectedNodeId) ? selectedNodeId : null)) {
+    next.add(id)
   }
-
-  walkStyleAncestors(station.primaryStyleId, next)
-  for (const sid of station.secondaryStyleIds) walkStyleAncestors(sid, next)
-  for (const did of station.descriptorIds) walkStyleAncestors(did, next)
   return next
 }
 
@@ -72,20 +92,9 @@ export function computeRadioFlowEdgeKeys(station: AtlasStation | undefined, sele
   const keys = new Set<string>()
   if (!playing || !station) return keys
 
-  let leaf: string | null = null
-  if (selectedNodeId && stationMatchesNode(station, selectedNodeId)) {
-    leaf = selectedNodeId
-  } else {
-    const pulse = pulseNodeIdsForPlayingStation(station, selectedNodeId)
-    let bestLv = 0
-    for (const pid of pulse) {
-      const node: AtlasNode | undefined = atlasData.nodeMap[pid]
-      if (node && node.level >= bestLv) {
-        bestLv = node.level
-        leaf = pid
-      }
-    }
-  }
+  const pathSeed = selectedNodeId && stationMatchesNode(station, selectedNodeId) ? selectedNodeId : null
+  const contextPath = stationContextPath(station, pathSeed)
+  const leaf = contextPath[0] ?? null
 
   if (!leaf) return keys
   const path = orderedPathRootToLeaf(leaf)

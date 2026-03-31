@@ -1,10 +1,11 @@
+import { memo } from 'react'
 import type { HoveredNode } from '../app/types'
 
 type HoverTooltipProps = {
   hovered: HoveredNode | null
 }
 
-export function HoverTooltip({ hovered }: HoverTooltipProps) {
+export const HoverTooltip = memo(function HoverTooltip({ hovered }: HoverTooltipProps) {
   return (
     <div id="tip" className={hovered ? 'show' : ''} style={hovered ? { left: hovered.x, top: hovered.y } : undefined}>
       <div id="tt-name">{hovered?.name}</div>
@@ -13,4 +14,4 @@ export function HoverTooltip({ hovered }: HoverTooltipProps) {
       <div id="tt-hint">{hovered?.hint}</div>
     </div>
   )
-}
+})

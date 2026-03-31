@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { getStationStyleLabels } from '../data/selectors'
 import type { AtlasNode, AtlasStation } from '../data/atlas'
 import { levelLabels } from '../app/constants'
@@ -47,7 +48,7 @@ type SidePanelProps = {
   onPlayStation: (station: AtlasStation) => void
 }
 
-export function SidePanel({
+function SidePanelComponent({
   open,
   hasPlayer,
   selectedNode,
@@ -126,3 +127,14 @@ export function SidePanel({
     </div>
   )
 }
+
+export const SidePanel = memo(SidePanelComponent, (prev, next) => (
+  prev.open === next.open &&
+  prev.hasPlayer === next.hasPlayer &&
+  prev.selectedNode === next.selectedNode &&
+  prev.panelStations === next.panelStations &&
+  prev.childCount === next.childCount &&
+  prev.currentStationId === next.currentStationId &&
+  prev.loadingStationId === next.loadingStationId &&
+  prev.playing === next.playing
+))
