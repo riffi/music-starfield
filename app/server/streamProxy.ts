@@ -4,6 +4,9 @@ import { URL } from 'node:url'
 import { PROXIED_STREAM_HOSTS } from '../shared/streamProxyConfig.js'
 
 const ALLOWED_STREAM_HOSTS = new Set<string>(PROXIED_STREAM_HOSTS)
+const UPSTREAM_REFERERS: Partial<Record<(typeof PROXIED_STREAM_HOSTS)[number], string>> = {
+  'us2.maindigitalstream.com': 'https://us7.maindigitalstream.com/',
+}
 
 type MiddlewareLikeRequest = http.IncomingMessage & { query?: Record<string, string | string[] | undefined> }
 
@@ -54,6 +57,8 @@ export function handleStreamProxy(req: MiddlewareLikeRequest, res: http.ServerRe
   }
 
   if (req.headers.range) headers.range = req.headers.range
+  const upstreamReferer = UPSTREAM_REFERERS[upstreamUrl.hostname as (typeof PROXIED_STREAM_HOSTS)[number]]
+  if (upstreamReferer) headers.referer = upstreamReferer
 
   const upstream = client.request(
     upstreamUrl,

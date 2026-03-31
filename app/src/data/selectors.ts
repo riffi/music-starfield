@@ -1,22 +1,41 @@
 import { atlasData, type AtlasNode, type AtlasStation } from './atlas'
+import { styleTaxonomy } from './taxonomy'
 
-export function stationMatchesNode(station: AtlasStation, nodeId: string) {
-  return (
-    station.primaryStyleId === nodeId ||
-    station.secondaryStyleIds.includes(nodeId) ||
-    station.descriptorIds.includes(nodeId)
-  )
+const BREAKBEAT_CLUSTER_ID = 'breakbeat'
+const CLUB_CLUSTER_ID = 'club'
+const STYLE_PARENT_BY_ID = Object.fromEntries(styleTaxonomy.map((taxon) => [taxon.id, taxon.parentId])) as Record<string, string | undefined>
+const STYLE_NAME_BY_ID = Object.fromEntries(styleTaxonomy.map((taxon) => [taxon.id, taxon.name])) as Record<string, string>
+const ATLAS_PARENT_OVERRIDES: Record<string, string | undefined> = {
+  breaks: BREAKBEAT_CLUSTER_ID,
+  drumandbass: BREAKBEAT_CLUSTER_ID,
+  atmosphericbreaks: BREAKBEAT_CLUSTER_ID,
+  liquidfunk: BREAKBEAT_CLUSTER_ID,
+  [BREAKBEAT_CLUSTER_ID]: 'electronic',
+  house: CLUB_CLUSTER_ID,
+  techno: CLUB_CLUSTER_ID,
+  deephouse: CLUB_CLUSTER_ID,
+  proghouse: CLUB_CLUSTER_ID,
+  techhouse: CLUB_CLUSTER_ID,
+  tropicalhouse: CLUB_CLUSTER_ID,
+  industrialtech: CLUB_CLUSTER_ID,
+  minimaltech: CLUB_CLUSTER_ID,
+  [CLUB_CLUSTER_ID]: 'electronic',
 }
 
-/** Ancestor chain in the atlas (child → … → root) for audio pulse on the graph. */
 function walkStyleAncestors(seed: string | undefined, into: Set<string>) {
-  let id: string | undefined = seed
+  let id = seed
   while (id) {
-    const node = atlasData.nodeMap[id]
-    if (!node) break
     into.add(id)
-    id = node.parentId
+    id = ATLAS_PARENT_OVERRIDES[id] ?? STYLE_PARENT_BY_ID[id]
   }
+}
+
+export function stationMatchesNode(station: AtlasStation, nodeId: string) {
+  const matchedIds = new Set<string>()
+  walkStyleAncestors(station.primaryStyleId, matchedIds)
+  for (const sid of station.secondaryStyleIds) walkStyleAncestors(sid, matchedIds)
+  for (const did of station.descriptorIds) walkStyleAncestors(did, matchedIds)
+  return matchedIds.has(nodeId)
 }
 
 /**
@@ -84,7 +103,9 @@ export function computeRadioFlowEdgeKeys(station: AtlasStation | undefined, sele
 }
 
 export function resolveStyleName(styleId: string) {
-  return atlasData.nodeMap[styleId]?.name ?? styleId
+  if (styleId === BREAKBEAT_CLUSTER_ID) return 'Breakbeat'
+  if (styleId === CLUB_CLUSTER_ID) return 'Club'
+  return atlasData.nodeMap[styleId]?.name ?? STYLE_NAME_BY_ID[styleId] ?? styleId
 }
 
 export function getStationStyleLabels(station: AtlasStation) {

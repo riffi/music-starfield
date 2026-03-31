@@ -354,6 +354,13 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       }
       return layout
     }
+    function computeLevel2Span(rootSpan: number, childCount: number, isActiveRoot: boolean) {
+      const densityFactor = Math.max(0.56, Math.min(1.32, 4 / Math.max(childCount, 1)))
+      const baseSpan = rootSpan * (isActiveRoot ? 0.92 : 0.88) * densityFactor
+      const minSpan = childCount <= 3 ? 0.78 : childCount <= 5 ? 0.58 : 0.42
+      const activeFloor = childCount <= 3 ? 0.92 : childCount <= 5 ? 0.72 : 0.5
+      return Math.min(Math.PI * 0.88, Math.max(baseSpan, isActiveRoot ? activeFloor : minSpan))
+    }
     function computeTargets(visibleNodes: RefNode[], activeRootId: string | null) {
       const targets = new Map<string, { x: number; y: number }>()
       const visibleIds = new Set(visibleNodes.map((node) => node.id))
@@ -376,7 +383,7 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
         const rootDirY = Math.sin(rootAngle)
         const rootTanX = Math.cos(rootAngle + Math.PI / 2)
         const rootTanY = Math.sin(rootAngle + Math.PI / 2)
-        const level2Span = Math.min(Math.PI * 0.86, Math.max(rootMeta.span * (isActiveRoot ? 0.94 : 0.9), isActiveRoot ? 0.82 : 0.56))
+        const level2Span = computeLevel2Span(rootMeta.span, level2Children.length, isActiveRoot)
         const level2TangentLimit = Math.tan(level2Span / 2) * baseLevel2Orbit * 0.96
         level2Children.forEach((child, childIndex) => {
           const level2Offset = distributeOffset(childIndex, level2Children.length)
@@ -600,7 +607,7 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
             const rootX = root.x ?? targets.get(root.id)!.x
             const rootY = root.y ?? targets.get(root.id)!.y
             const level2Children = (childrenByParent[root.id] ?? []).filter((c) => visibleIds.has(c.id))
-            const level2Span = Math.min(Math.PI * 0.92, Math.max(rootMeta.span * 0.9, 0.56))
+            const level2Span = computeLevel2Span(rootMeta.span, level2Children.length, activeRootId === root.id)
             for (const child of level2Children) {
               const cx = child.x ?? targets.get(child.id)!.x
               const cy = child.y ?? targets.get(child.id)!.y
