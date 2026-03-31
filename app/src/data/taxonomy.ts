@@ -43,6 +43,7 @@ export type StationBinding = {
   id: string
   name: string
   streamUrl: string
+  description?: string
   countryLabel: string
   bitrateLabel: string
   primaryStyleId: string
@@ -92,7 +93,7 @@ export const styleTaxonomy: StyleTaxon[] = [
   { id: 'ambient', name: 'Ambient', root: 'electronic', kind: 'genre', level: 2, parentId: 'electronic', isAtlasVisible: true },
   { id: 'house', name: 'House', root: 'electronic', kind: 'genre', level: 2, parentId: 'electronic' },
   { id: 'techno', name: 'Techno', root: 'electronic', kind: 'genre', level: 2, parentId: 'electronic', isAtlasVisible: true },
-  { id: 'trance', name: 'Trance', root: 'electronic', kind: 'genre', level: 2, parentId: 'electronic', isAtlasVisible: true },
+  { id: 'trance', name: 'Trance', root: 'electronic', kind: 'genre', level: 2, parentId: 'electronic' },
   { id: 'eurodance', name: 'Eurodance', root: 'electronic', kind: 'genre', level: 2, parentId: 'electronic', isAtlasVisible: true },
   { id: 'ukgarage', name: 'UK Garage', root: 'electronic', kind: 'genre', level: 2, parentId: 'electronic' },
   { id: 'breaks', name: 'Breaks', root: 'electronic', kind: 'genre', level: 2, parentId: 'electronic', isAtlasVisible: true },
@@ -162,6 +163,10 @@ export const styleTaxonomy: StyleTaxon[] = [
   { id: 'industrialtech', name: 'Industrial Techno', root: 'electronic', kind: 'genre', level: 3, parentId: 'techno', isAtlasVisible: true },
   { id: 'minimaltech', name: 'Minimal Techno', root: 'electronic', kind: 'genre', level: 3, parentId: 'techno', isAtlasVisible: true },
   { id: 'melodictechno', name: 'Melodic Techno', root: 'electronic', kind: 'genre', level: 3, parentId: 'techno', isAtlasVisible: true },
+  { id: 'upliftingtrance', name: 'Uplifting Trance', root: 'electronic', kind: 'genre', level: 3, parentId: 'trance', isAtlasVisible: true },
+  { id: 'classictrance', name: 'Classic Trance', root: 'electronic', kind: 'genre', level: 3, parentId: 'trance', isAtlasVisible: true },
+  { id: 'goatrance', name: 'Goa Trance', root: 'electronic', kind: 'genre', level: 3, parentId: 'trance', isAtlasVisible: true },
+  { id: 'vocaltrance', name: 'Vocal Trance', root: 'electronic', kind: 'descriptor', level: 3, parentId: 'trance' },
   { id: 'futuregarage', name: 'Future Garage', root: 'electronic', kind: 'genre', level: 3, parentId: 'downtempo', isAtlasVisible: true },
   { id: 'dubstep', name: 'Dubstep', root: 'electronic', kind: 'genre', level: 3, parentId: 'ukgarage' },
   { id: 'atmosphericbreaks', name: 'Atmospheric Breaks', root: 'electronic', kind: 'style', level: 3, parentId: 'breaks', isAtlasVisible: true },
@@ -263,6 +268,9 @@ export const styleRelations: StyleRelation[] = [
   { id: 'house-parent-proghouse', sourceId: 'house', targetId: 'proghouse', kind: 'parent_of' },
   { id: 'house-parent-techhouse', sourceId: 'house', targetId: 'techhouse', kind: 'parent_of' },
   { id: 'house-parent-tropicalhouse', sourceId: 'house', targetId: 'tropicalhouse', kind: 'parent_of' },
+  { id: 'trance-parent-upliftingtrance', sourceId: 'trance', targetId: 'upliftingtrance', kind: 'parent_of' },
+  { id: 'trance-parent-classictrance', sourceId: 'trance', targetId: 'classictrance', kind: 'parent_of' },
+  { id: 'trance-parent-goatrance', sourceId: 'trance', targetId: 'goatrance', kind: 'parent_of' },
   { id: 'techno-parent-industrialtech', sourceId: 'techno', targetId: 'industrialtech', kind: 'parent_of' },
   { id: 'techno-parent-minimaltech', sourceId: 'techno', targetId: 'minimaltech', kind: 'parent_of' },
   { id: 'techno-parent-melodictechno', sourceId: 'techno', targetId: 'melodictechno', kind: 'parent_of' },
@@ -487,7 +495,8 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://icecast.pulsradio.com/pulstranceHD.mp3',
     countryLabel: 'FR',
     bitrateLabel: '192k',
-    primaryStyleId: 'trance',
+    primaryStyleId: 'upliftingtrance',
+    secondaryStyleIds: ['trance'],
   },
   {
     id: 'anima-amoris-trance',
@@ -495,7 +504,39 @@ export const stationBindings: StationBinding[] = [
     streamUrl: 'https://amoris.sknt.ru/trance',
     countryLabel: 'RU',
     bitrateLabel: '160k',
-    primaryStyleId: 'trance',
+    primaryStyleId: 'upliftingtrance',
+    secondaryStyleIds: ['trance'],
+  },
+  {
+    id: 'record-trance-hits',
+    name: 'Trance Hits (Record Radio)',
+    streamUrl: 'https://hls-01-radiorecord.hostingradio.ru/record-trancehits/playlist.m3u8',
+    countryLabel: 'RU',
+    bitrateLabel: 'HLS',
+    primaryStyleId: 'classictrance',
+    secondaryStyleIds: ['trance'],
+  },
+  {
+    id: 'dfm-vocal-trance',
+    name: 'Vocal Trance (DFM)',
+    streamUrl: 'https://hls-01-dfm.hostingradio.ru/trance/playlist.m3u8',
+    description: 'Онлайн-канал DFM с вокальным трансом. Слушайте эфир Vocal Trance (DFM) в отличном качестве, бесплатно и без регистрации.',
+    countryLabel: 'RU',
+    bitrateLabel: 'HLS',
+    primaryStyleId: 'upliftingtrance',
+    secondaryStyleIds: ['trance'],
+    descriptorIds: ['vocaltrance'],
+  },
+  {
+    id: 'radio-caprice-vocal-trance',
+    name: 'VOCAL TRANCE - RADio CAPrice',
+    streamUrl: 'http://79.120.39.202:8000/vocaltrance',
+    description: 'Канал RADio CAPrice из Москвы с вокальным трансом; на источнике заявлен поток 320 kbps.',
+    countryLabel: 'RU',
+    bitrateLabel: '320k',
+    primaryStyleId: 'upliftingtrance',
+    secondaryStyleIds: ['trance'],
+    descriptorIds: ['vocaltrance'],
   },
   {
     id: '90s-eurodance',

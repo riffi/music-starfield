@@ -61,6 +61,7 @@ Current atlas rules:
 - House and techno substyles render as `level 4` under those `level 3` nodes.
 - `breaks` and `drumandbass` render as `level 3` under `breakbeat`.
 - `atmosphericbreaks` and `liquidfunk` render as `level 4` under those `level 3` nodes.
+- `trance` stays canonical, but the visible trance branch is split into `upliftingtrance`, `classictrance`, and `goatrance`.
 - `vocalchillout` is projected as `level 4` under `chillout`.
 
 Important consequence:

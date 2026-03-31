@@ -14,9 +14,15 @@ import { atlasData, type AtlasNode, type AtlasStation } from '../data/atlas'
 
 type UseRadioPlayerArgs = {
   selectedNode: AtlasNode | null
+  initialNormalizationEnabled: boolean
+  initialNormalizationAggression: number
 }
 
-export function useRadioPlayer({ selectedNode }: UseRadioPlayerArgs) {
+export function useRadioPlayer({
+  selectedNode,
+  initialNormalizationEnabled,
+  initialNormalizationAggression,
+}: UseRadioPlayerArgs) {
   const AUTO_GAIN_TARGET_RMS = 0.18
   const AUTO_GAIN_SILENCE_THRESHOLD = 0.02
   const AUTO_GAIN_MIN = 0.72
@@ -33,8 +39,8 @@ export function useRadioPlayer({ selectedNode }: UseRadioPlayerArgs) {
   const compressorRef = useRef<DynamicsCompressorNode | null>(null)
   const autoGainRef = useRef<GainNode | null>(null)
   const outputGainRef = useRef<GainNode | null>(null)
-  const normalizationEnabledRef = useRef(true)
-  const normalizationAggressionRef = useRef(55)
+  const normalizationEnabledRef = useRef(initialNormalizationEnabled)
+  const normalizationAggressionRef = useRef(initialNormalizationAggression)
   const waveformFrameRef = useRef<number | null>(null)
 
   const [currentStationId, setCurrentStationId] = useState<string | null>(null)
@@ -44,8 +50,8 @@ export function useRadioPlayer({ selectedNode }: UseRadioPlayerArgs) {
   const [currentTrackTitle, setCurrentTrackTitle] = useState('')
   const [playing, setPlaying] = useState(false)
   const [volume, setVolume] = useState(75)
-  const [normalizationEnabled, setNormalizationEnabled] = useState(true)
-  const [normalizationAggression, setNormalizationAggression] = useState(55)
+  const [normalizationEnabled, setNormalizationEnabled] = useState(initialNormalizationEnabled)
+  const [normalizationAggression, setNormalizationAggression] = useState(initialNormalizationAggression)
   const [spectrumLevels, setSpectrumLevels] = useState<number[] | null>(null)
 
   const waveformState: 'idle' | 'loading' | 'playing' = loadingStationId ? 'loading' : playing ? 'playing' : 'idle'

@@ -106,7 +106,7 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
       ctx.fillRect(0, 0, width, height)
     }
 
-    function drawMilkyWay(audioEnergy: number) {
+    function drawMilkyWay() {
       const mwAngle = -0.34
       const mwCx = width * 0.54 + viewportRef.current.x * 0.006
       const mwCy = height * 0.42 + viewportRef.current.y * 0.004
@@ -122,7 +122,7 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
       )
       mainBand.addColorStop(0, 'rgba(92,130,230,0)')
       mainBand.addColorStop(0.16, 'rgba(92,130,230,0.03)')
-      mainBand.addColorStop(0.5, `rgba(168,198,255,${0.11 + audioEnergy * 0.05})`)
+      mainBand.addColorStop(0.5, 'rgba(168,198,255,0.11)')
       mainBand.addColorStop(0.82, 'rgba(92,130,230,0.036)')
       mainBand.addColorStop(1, 'rgba(92,130,230,0)')
       ctx.fillStyle = mainBand
@@ -135,7 +135,7 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
         mwCy - mwPerpY * height * 0.1,
       )
       warmCore.addColorStop(0, 'rgba(255,214,150,0)')
-      warmCore.addColorStop(0.5, `rgba(255,214,150,${0.034 + audioEnergy * 0.018})`)
+      warmCore.addColorStop(0.5, 'rgba(255,214,150,0.034)')
       warmCore.addColorStop(1, 'rgba(255,214,150,0)')
       ctx.fillStyle = warmCore
       ctx.fillRect(0, 0, width, height)
@@ -337,7 +337,7 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
       audioEnergy = audioDataRef.current.energy
 
       drawBackgroundGradient(audioEnergy)
-      drawMilkyWay(audioEnergy)
+      drawMilkyWay()
       drawAmbientNebulae(audioBass, audioEnergy)
       drawActiveRootNebula(audioBass, audioEnergy)
       drawFlightStars(audioBass, audioEnergy)

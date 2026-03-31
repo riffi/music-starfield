@@ -8,4 +8,5 @@ export const PROXIED_STREAM_HOSTS = [
   'us2.maindigitalstream.com',
   'stream02.fmcube.net',
   'radiorecord.hostingradio.ru',
+  '79.120.39.202',
 ] as const

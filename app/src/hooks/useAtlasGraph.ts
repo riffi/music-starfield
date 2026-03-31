@@ -11,17 +11,36 @@ type UseAtlasGraphArgs = {
   playing: boolean
   audioDataRef: React.MutableRefObject<AudioLevels>
   viewportRef: React.MutableRefObject<ViewportState>
+  expandedIds: string[]
+  setExpandedIds: React.Dispatch<React.SetStateAction<string[]>>
   selectedId: string | null
   setSelectedId: React.Dispatch<React.SetStateAction<string | null>>
   setPanelOpen: React.Dispatch<React.SetStateAction<boolean>>
   setHovered: React.Dispatch<React.SetStateAction<HoveredNode | null>>
 }
 
-export function useAtlasGraph({ referenceNodes, currentStationId, playing, audioDataRef, viewportRef, selectedId, setSelectedId, setPanelOpen, setHovered }: UseAtlasGraphArgs) {
+export function useAtlasGraph({
+  referenceNodes,
+  currentStationId,
+  playing,
+  audioDataRef,
+  viewportRef,
+  expandedIds,
+  setExpandedIds,
+  selectedId,
+  setSelectedId,
+  setPanelOpen,
+  setHovered,
+}: UseAtlasGraphArgs) {
   const graphRef = useRef<SVGSVGElement | null>(null)
   const pulseFrameRef = useRef<number | null>(null)
   const stationPulseIdsRef = useRef<Set<string>>(new Set())
   const flowEdgeKeysRef = useRef<Set<string>>(new Set())
+  const expandedIdsRef = useRef<Set<string>>(new Set(expandedIds))
+
+  useEffect(() => {
+    expandedIdsRef.current = new Set(expandedIds)
+  }, [expandedIds])
 
   function isLeafLevel(level: RefNode['level']) {
     return level >= 3
@@ -234,7 +253,7 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
     const flowG = g.append('g')
     const nodeG = g.append('g')
     const labelG = g.append('g')
-    const expanded = new Set<string>()
+    const expanded = expandedIdsRef.current
     let previousGraphActiveRootId: string | null = null
     let previousGraphActiveLevel2Id: string | null = null
 
@@ -523,10 +542,12 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
           collapseSiblingBranches(node.id, node.parent)
           expanded.add(node.id)
         }
+        setExpandedIds([...expanded])
         update(false)
       } else {
         if (shouldCollapseOtherRoots && rootId) {
           collapseOtherRoots(rootId)
+          setExpandedIds([...expanded])
           update(false)
         }
         simulation.stop()
@@ -678,6 +699,8 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
         activeLinkSelection.style('opacity', (d) => dimLinkOpacity(d))
       }
 
+      if (selectedId && visibleIds.has(selectedId)) highlight(selectedId)
+
       simulation.nodes(visibleNodes)
       simulation.force<d3.ForceLink<RefNode, RefLink>>('link')?.links(visibleLinks)
 
@@ -799,7 +822,7 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       svg.on('.zoom', null)
       svg.on('click.bg', null)
     }
-  }, [referenceNodes, viewportRef])
+  }, [referenceNodes, setExpandedIds, setPanelOpen, setSelectedId, setHovered, viewportRef])
 
   return { graphRef }
 }

@@ -19,6 +19,7 @@ export type AtlasStation = {
   id: string
   name: string
   streamUrl: string
+  description?: string
   countryLabel: string
   bitrateLabel: string
   primaryStyleId: string
@@ -106,6 +107,7 @@ const stations: AtlasStation[] = stationBindings.map((binding) => ({
   id: binding.id,
   name: binding.name,
   streamUrl: binding.streamUrl,
+  description: binding.description,
   countryLabel: binding.countryLabel,
   bitrateLabel: binding.bitrateLabel,
   primaryStyleId: binding.primaryStyleId,

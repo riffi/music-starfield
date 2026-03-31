@@ -64,6 +64,11 @@ export function SidePanel({
                       {loading ? <span className="btn-spinner" /> : active && playing ? '⏸' : '▶'}
                     </button>
                   </div>
+                  {station.description ? (
+                    <div className="s-taxonomy">
+                      <span className="s-taxonomy-row">{station.description}</span>
+                    </div>
+                  ) : null}
                   <div className="s-taxonomy">
                     <span className="s-taxonomy-row">Primary: {styleLabels.primary}</span>
                     {styleLabels.related.length ? <span className="s-taxonomy-row">Related: {styleLabels.related.join(' • ')}</span> : null}
