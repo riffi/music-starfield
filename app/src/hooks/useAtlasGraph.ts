@@ -107,6 +107,11 @@ export function useAtlasGraph({
         const baseR = d.level === 1 ? 27 : d.level === 2 ? 16 : d.level === 3 ? 9 : 7
         grp.select('circle.gring-halo').attr('opacity', 0)
         grp.select('circle.gring-rim').attr('opacity', 0)
+        grp.select('circle.nexpand-orbit')
+          .attr('r', expandableOrbitRadius(d.level, baseR))
+          .attr('stroke-opacity', d.level === 1 ? 0.3 : 0.24)
+          .attr('stroke-width', d.level === 1 ? 0.6 : 0.52)
+          .attr('stroke-dashoffset', 0)
         if (d.level === 1) {
           grp.select('circle.gring-mid-halo').attr('opacity', 0)
           grp.select('circle.gring-mid-rim').attr('opacity', 0)
@@ -173,6 +178,11 @@ export function useAtlasGraph({
           if (!pulseThis) {
             grp.select('circle.gring-halo').attr('opacity', 0)
             grp.select('circle.gring-rim').attr('opacity', 0)
+            grp.select('circle.nexpand-orbit')
+              .attr('r', expandableOrbitRadius(d.level, baseR))
+              .attr('stroke-opacity', d.level === 1 ? 0.3 : 0.24)
+              .attr('stroke-width', d.level === 1 ? 0.6 : 0.52)
+              .attr('stroke-dashoffset', 0)
             if (d.level === 1) {
               grp.select('circle.gring-mid-halo').attr('opacity', 0)
               grp.select('circle.gring-mid-rim').attr('opacity', 0)
@@ -187,19 +197,39 @@ export function useAtlasGraph({
 
           const ringFreq = d.level === 1 ? 0.42 : d.level === 2 ? 0.58 : d.level === 3 ? 0.76 : 0.88
           const ringWave = Math.abs(Math.sin(pt * ringFreq + phase))
-          const levelHaloBase = d.level === 1 ? 0.12 : d.level === 2 ? 0.15 : d.level === 3 ? 0.12 : 0.1
-          const levelHaloWave = d.level === 1 ? 0.35 : d.level === 2 ? 0.4 : d.level === 3 ? 0.38 : 0.32
-          const levelHaloAudio = d.level === 1 ? 0.12 : d.level === 2 ? 0.18 : d.level === 3 ? 0.15 : 0.12
-          const levelHaloCap = d.level === 1 ? 0.6 : d.level === 2 ? 0.7 : d.level === 3 ? 0.65 : 0.55
-          const levelRimBase = d.level === 1 ? 0.15 : d.level === 2 ? 0.18 : d.level === 3 ? 0.15 : 0.12
-          const levelRimWave = d.level === 1 ? 0.4 : d.level === 2 ? 0.45 : d.level === 3 ? 0.42 : 0.38
-          const levelRimAudio = d.level === 1 ? 0.15 : d.level === 2 ? 0.2 : d.level === 3 ? 0.18 : 0.15
-          const levelRimCap = d.level === 1 ? 0.7 : d.level === 2 ? 0.8 : d.level === 3 ? 0.75 : 0.65
+          const levelHaloBase = d.level === 1 ? 0.045 : d.level === 2 ? 0.055 : d.level === 3 ? 0.05 : 0.04
+          const levelHaloWave = d.level === 1 ? 0.11 : d.level === 2 ? 0.14 : d.level === 3 ? 0.125 : 0.1
+          const levelHaloAudio = d.level === 1 ? 0.04 : d.level === 2 ? 0.055 : d.level === 3 ? 0.05 : 0.04
+          const levelHaloCap = d.level === 1 ? 0.17 : d.level === 2 ? 0.2 : d.level === 3 ? 0.18 : 0.16
+          const levelRimBase = d.level === 1 ? 0.055 : d.level === 2 ? 0.07 : d.level === 3 ? 0.06 : 0.05
+          const levelRimWave = d.level === 1 ? 0.12 : d.level === 2 ? 0.15 : d.level === 3 ? 0.13 : 0.11
+          const levelRimAudio = d.level === 1 ? 0.045 : d.level === 2 ? 0.06 : d.level === 3 ? 0.05 : 0.045
+          const levelRimCap = d.level === 1 ? 0.2 : d.level === 2 ? 0.24 : d.level === 3 ? 0.21 : 0.18
           const haloFillOp = Math.min(levelHaloBase + ringWave * levelHaloWave + audioOpacityBoost * levelHaloAudio, levelHaloCap)
           const rimStrokeOp = Math.min(levelRimBase + ringWave * levelRimWave + audioOpacityBoost * levelRimAudio, levelRimCap)
+          const haloRadius = baseR * (d.level === 1 ? 1.46 : d.level === 2 ? 1.5 : 1.44) * (1 + ringWave * 0.07 + bass * 0.03)
+          const rimRadius = baseR * (d.level === 1 ? 1.76 : d.level === 2 ? 1.82 : 1.72) * (1 + ringWave * 0.095 + energy * 0.04)
+          const rimStrokeWidth = (d.level === 1 ? 0.46 : d.level === 2 ? 0.38 : 0.34) * (1 + ringWave * 0.42 + bass * 0.18)
 
-          grp.select('circle.gring-halo').attr('opacity', 1).attr('r', baseR * 1.42).attr('fill-opacity', haloFillOp)
-          grp.select('circle.gring-rim').attr('opacity', 1).attr('r', baseR * 1.68).attr('stroke-opacity', rimStrokeOp)
+          grp.select('circle.gring-halo')
+            .attr('opacity', 1)
+            .attr('r', haloRadius)
+            .attr('fill-opacity', haloFillOp)
+          grp.select('circle.gring-rim')
+            .attr('opacity', 1)
+            .attr('r', rimRadius)
+            .attr('stroke-width', rimStrokeWidth)
+            .attr('stroke-opacity', rimStrokeOp)
+          const orbitBaseRadius = expandableOrbitRadius(d.level, baseR)
+          const orbitRadius = orbitBaseRadius * (1 + ringWave * 0.032 + bass * 0.018)
+          const orbitStrokeOpacity = Math.min(d.level === 1 ? 0.78 : 0.72, (d.level === 1 ? 0.34 : 0.28) + ringWave * 0.24 + audioOpacityBoost * 0.16)
+          const orbitStrokeWidth = (d.level === 1 ? 0.6 : 0.52) * (1.04 + ringWave * 0.28 + bass * 0.1)
+          const orbitDashOffset = pt * (d.level === 1 ? -5.8 : d.level === 2 ? -8.5 : -11.5) + phase * 2.6
+          grp.select('circle.nexpand-orbit')
+            .attr('r', orbitRadius)
+            .attr('stroke-opacity', orbitStrokeOpacity)
+            .attr('stroke-width', orbitStrokeWidth)
+            .attr('stroke-dashoffset', orbitDashOffset)
 
           const bodyPulseStrokeWidth = nodeStrokeWidth(d.level) * (1.2 + ringWave * 1.2 + bass * 0.6)
           const bodyPulseStrokeOpacity = Math.min(1, 0.75 + ringWave * 0.25)
@@ -296,7 +326,13 @@ export function useAtlasGraph({
 
     const defs = svg.append('defs')
     ;['glow3', 'glow6', 'glow10'].forEach((id, index) => {
-      const filter = defs.append('filter').attr('id', id).attr('x', '-80%').attr('y', '-80%').attr('width', '260%').attr('height', '260%')
+      const filter = defs.append('filter')
+        .attr('id', id)
+        .attr('x', '-120%')
+        .attr('y', '-120%')
+        .attr('width', '340%')
+        .attr('height', '340%')
+        .attr('color-interpolation-filters', 'sRGB')
       filter.append('feGaussianBlur').attr('in', 'SourceGraphic').attr('stdDeviation', [3, 6, 10][index]).attr('result', 'blur')
       const merge = filter.append('feMerge')
       merge.append('feMergeNode').attr('in', 'blur')

@@ -12,7 +12,7 @@ type Nebula = {
 }
 
 type FlightStar = { x: number; y: number; r: number; op: number; ph: number; col: string; depth: number; glow: number }
-type ShootingStar = { x: number; y: number; vx: number; vy: number; spd: number; len: number; alpha: number; col: string }
+type ShootingStar = { x: number; y: number; vx: number; vy: number; spd: number; len: number; alpha: number; col: string; width: number; glow: number }
 
 type UseStarfieldArgs = {
   canvasRef: RefObject<HTMLCanvasElement | null>
@@ -193,7 +193,7 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
       star.y = height * 0.5 + Math.sin(angle) * spawnRadius
     }
 
-    function drawFlightStars(audioBass: number, audioEnergy: number, audioReactive: boolean) {
+    function drawFlightStars(audioBass: number, audioEnergy: number, audioReactive: boolean, frameScale: number) {
       const focusX = viewportRef.current.focusX || width * 0.5
       const focusY = viewportRef.current.focusY || height * 0.5
       const maxRadius = Math.max(width, height) * 0.72
@@ -204,9 +204,9 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
         const ux = dx / dist
         const uy = dy / dist
         const edgeBoost = Math.min(1.25, dist / maxRadius)
-        const flightSpeed = 0.052 + star.depth * 0.082 + edgeBoost * 0.14 + (audioReactive ? audioEnergy * 0.01 + audioBass * 0.008 : 0)
-        star.x += ux * flightSpeed
-        star.y += uy * flightSpeed
+        const flightSpeed = 0.068 + star.depth * 0.106 + edgeBoost * 0.182 + (audioReactive ? audioEnergy * 0.014 + audioBass * 0.01 : 0)
+        star.x += ux * flightSpeed * frameScale
+        star.y += uy * flightSpeed * frameScale
 
         if (star.x < -80 || star.x > width + 80 || star.y < -80 || star.y > height + 80) {
           respawnFlightStar(star)
@@ -255,7 +255,7 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
       }
     }
 
-    function drawShootingStars(enabled: boolean) {
+    function drawShootingStars(enabled: boolean, frameScale: number) {
       if (!enabled) {
         shootingStars = []
         return
@@ -278,15 +278,17 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
           len: Math.random() * 100 + 60,
           alpha: 0.9,
           col: Math.random() > 0.6 ? '255,242,200' : '210,228,255',
+          width: Math.random() * 0.9 + 1.1,
+          glow: Math.random() * 4 + 4,
         })
-        nextShootAt = t + Math.random() * 5 + 2
+        nextShootAt = t + Math.random() * 8 + 6
       }
 
       for (let si = shootingStars.length - 1; si >= 0; si -= 1) {
         const star = shootingStars[si]
-        star.x += star.vx
-        star.y += star.vy
-        star.alpha -= 0.0085
+        star.x += star.vx * frameScale
+        star.y += star.vy * frameScale
+        star.alpha -= 0.0085 * frameScale
 
         if (star.alpha <= 0 || star.x > width + 140 || star.y > height + 140 || star.x < -140) {
           shootingStars.splice(si, 1)
@@ -296,21 +298,47 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
         const invSpd = star.spd > 0 ? 1 / star.spd : 1
         const tailX = star.x - star.vx * invSpd * star.len
         const tailY = star.y - star.vy * invSpd * star.len
-        const gradient = ctx.createLinearGradient(tailX, tailY, star.x, star.y)
-        gradient.addColorStop(0, `rgba(${star.col},0)`)
-        gradient.addColorStop(0.7, `rgba(${star.col},${star.alpha * 0.4})`)
-        gradient.addColorStop(1, `rgba(${star.col},${star.alpha})`)
+
+        const trail = ctx.createLinearGradient(tailX, tailY, star.x, star.y)
+        trail.addColorStop(0, `rgba(${star.col},0)`)
+        trail.addColorStop(0.2, `rgba(${star.col},${star.alpha * 0.025})`)
+        trail.addColorStop(0.68, `rgba(${star.col},${star.alpha * 0.22})`)
+        trail.addColorStop(1, `rgba(${star.col},${star.alpha * 0.88})`)
         ctx.beginPath()
         ctx.moveTo(tailX, tailY)
         ctx.lineTo(star.x, star.y)
-        ctx.strokeStyle = gradient
-        ctx.lineWidth = 1.6
+        ctx.strokeStyle = trail
+        ctx.lineWidth = star.width * 2.4
+        ctx.lineCap = 'round'
         ctx.stroke()
-        const headGlow = ctx.createRadialGradient(star.x, star.y, 0, star.x, star.y, 5)
-        headGlow.addColorStop(0, `rgba(${star.col},${star.alpha})`)
+
+        const coreTrail = ctx.createLinearGradient(tailX, tailY, star.x, star.y)
+        coreTrail.addColorStop(0, `rgba(255,255,255,0)`)
+        coreTrail.addColorStop(0.55, `rgba(255,255,255,${star.alpha * 0.06})`)
+        coreTrail.addColorStop(1, `rgba(255,255,255,${star.alpha * 0.92})`)
+        ctx.beginPath()
+        ctx.moveTo(tailX + (star.x - tailX) * 0.18, tailY + (star.y - tailY) * 0.18)
+        ctx.lineTo(star.x, star.y)
+        ctx.strokeStyle = coreTrail
+        ctx.lineWidth = star.width * 0.72
+        ctx.lineCap = 'round'
+        ctx.stroke()
+
+        const coma = ctx.createRadialGradient(star.x, star.y, 0, star.x, star.y, star.glow * 1.9)
+        coma.addColorStop(0, `rgba(${star.col},${star.alpha * 0.7})`)
+        coma.addColorStop(0.38, `rgba(${star.col},${star.alpha * 0.18})`)
+        coma.addColorStop(1, `rgba(${star.col},0)`)
+        ctx.beginPath()
+        ctx.arc(star.x, star.y, star.glow * 1.9, 0, Math.PI * 2)
+        ctx.fillStyle = coma
+        ctx.fill()
+
+        const headGlow = ctx.createRadialGradient(star.x, star.y, 0, star.x, star.y, star.glow)
+        headGlow.addColorStop(0, `rgba(255,255,255,${Math.min(1, star.alpha * 1.05)})`)
+        headGlow.addColorStop(0.35, `rgba(${star.col},${star.alpha * 0.95})`)
         headGlow.addColorStop(1, `rgba(${star.col},0)`)
         ctx.beginPath()
-        ctx.arc(star.x, star.y, 5, 0, Math.PI * 2)
+        ctx.arc(star.x, star.y, star.glow, 0, Math.PI * 2)
         ctx.fillStyle = headGlow
         ctx.fill()
       }
@@ -323,10 +351,12 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
         frameId = requestAnimationFrame(draw)
         return
       }
+      const elapsedMs = lastDrawAt ? now - lastDrawAt : frameInterval
+      const frameScale = elapsedMs / (1000 / IDLE_FPS)
       lastDrawAt = now
 
       ctx.clearRect(0, 0, width, height)
-      t += 0.008
+      t += elapsedMs * 0.00048
 
       let audioBass = 0
       let audioEnergy = 0
@@ -359,8 +389,8 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
         drawAmbientNebulae(audioBass, audioEnergy)
         drawActiveRootNebula(audioBass, audioEnergy)
       }
-      drawFlightStars(audioBass, audioEnergy, audioReactive)
-      drawShootingStars(!audioReactive)
+      drawFlightStars(audioBass, audioEnergy, audioReactive, frameScale)
+      drawShootingStars(true, frameScale)
 
       frameId = requestAnimationFrame(draw)
     }
