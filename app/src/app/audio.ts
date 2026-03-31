@@ -14,7 +14,7 @@ const SOMAFM_CHANNELS: Record<string, string> = {
   bossa: 'bossa',
 }
 
-const PROXIED_STATIONS = new Set(['hearme-future-garage', 'hearme-vocal-chillout', 'atmfm-breaks', 'ural-sound', 'puls-radio-trance', '90s-eurodance'])
+const PROXIED_STATIONS = new Set(['hearme-future-garage', 'hearme-vocal-chillout', 'atmfm-breaks', 'ural-sound', 'puls-radio-trance', '90s-eurodance', 'liquid-dnb-station'])
 
 export type SomaChannelsResponse = {
   channels?: {
