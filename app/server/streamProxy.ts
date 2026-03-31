@@ -2,7 +2,7 @@ import http from 'node:http'
 import https from 'node:https'
 import { URL } from 'node:url'
 
-const ALLOWED_STREAM_HOSTS = new Set(['radio.hearme.fm', 'station-sound.ru', '5.restream.one', 'icecast.pulsradio.com'])
+const ALLOWED_STREAM_HOSTS = new Set(['radio.hearme.fm', 'station-sound.ru', '5.restream.one', 'icecast.pulsradio.com', 'listen1.myradio24.com'])
 
 type MiddlewareLikeRequest = http.IncomingMessage & { query?: Record<string, string | string[] | undefined> }
 
