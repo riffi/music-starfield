@@ -236,7 +236,7 @@ export function useAtlasGraph({
           const key = `${src.id}>${tgt.id}`
           const line = d3.select(this)
           if (flowActive && flowKeys.has(key)) {
-            line.style('stroke-dasharray', src.level === 1 ? '7,10' : '4,8').style('stroke-dashoffset', '0').style('stroke-opacity', String(Math.min(0.34, 0.14 + audioOpacityBoost * 0.18))).style('stroke-width', String(src.level === 1 ? 1.55 : 1.02))
+            line.style('stroke-dasharray', src.level === 1 ? '7,10' : '4,8').style('stroke-dashoffset', '0').style('stroke-opacity', String(Math.min(0.5, 0.22 + audioOpacityBoost * 0.22))).style('stroke-width', String(src.level === 1 ? 1.55 : 1.02))
           } else {
             line.style('stroke-dasharray', src.level === 1 ? '5,5' : '2,5').style('stroke-dashoffset', null).style('stroke-opacity', '0.22').style('stroke-width', String(src.level === 1 ? 1.4 : 0.9))
           }
@@ -258,7 +258,7 @@ export function useAtlasGraph({
             const gapLen = Math.max(src.level === 1 ? 34 : 24, len * 0.9)
             const period = dashLen + gapLen
             const flowOff = (pt * (src.level === 1 ? 62 : 54)) % period
-            const flowOpacity = Math.min(0.6, 0.24 + bass * 0.16 + energy * 0.12)
+            const flowOpacity = Math.min(0.8, 0.35 + bass * 0.2 + energy * 0.15)
             const flowWidth = src.level === 1 ? 1.9 : 1.4
             line.style('stroke-dasharray', `${dashLen} ${gapLen}`).style('stroke-dashoffset', String(-flowOff)).style('stroke-opacity', String(flowOpacity)).style('stroke-width', String(flowWidth))
           } else {
