@@ -341,8 +341,8 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
         for (let fi = 0; fi < freqData.length; fi += 1) sum += freqData[fi]
         audioEnergy = sum / (freqData.length * 255)
         audioDataRef.current = {
-          bass: audioDataRef.current.bass * 0.18 + audioBass * 0.82,
-          energy: audioDataRef.current.energy * 0.22 + audioEnergy * 0.78,
+          bass: audioDataRef.current.bass * 0.25 + audioBass * 0.75,
+          energy: audioDataRef.current.energy * 0.3 + audioEnergy * 0.7,
         }
       } else {
         audioDataRef.current = {

@@ -95,7 +95,7 @@ export function useRadioPlayer({
 
         const analyser = audioContextRef.current.createAnalyser()
         analyser.fftSize = 256
-        analyser.smoothingTimeConstant = 0.48
+        analyser.smoothingTimeConstant = 0.1
 
         const outputGain = audioContextRef.current.createGain()
         outputGain.gain.value = volume / 100

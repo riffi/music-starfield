@@ -162,7 +162,7 @@ export function useAtlasGraph({
 
         lastVisualFrameAt = now
         pulseVisualsActiveRef.current = true
-        const audioOpacityBoost = bass * 0.12 + energy * 0.05
+        const audioOpacityBoost = bass * 0.5 + energy * 0.25
 
         d3.select(svgEl).selectAll<SVGGElement, RefNode>('g.nd').each(function (d, i) {
           const grp = d3.select(this)
@@ -187,25 +187,25 @@ export function useAtlasGraph({
 
           const ringFreq = d.level === 1 ? 0.42 : d.level === 2 ? 0.58 : d.level === 3 ? 0.76 : 0.88
           const ringWave = Math.abs(Math.sin(pt * ringFreq + phase))
-          const levelHaloBase = d.level === 1 ? 0.16 : d.level === 2 ? 0.2 : d.level === 3 ? 0.16 : 0.14
-          const levelHaloWave = d.level === 1 ? 0.1 : d.level === 2 ? 0.14 : d.level === 3 ? 0.12 : 0.1
-          const levelHaloAudio = d.level === 1 ? 0.08 : d.level === 2 ? 0.14 : d.level === 3 ? 0.12 : 0.1
-          const levelHaloCap = d.level === 1 ? 0.3 : d.level === 2 ? 0.38 : d.level === 3 ? 0.3 : 0.26
-          const levelRimBase = d.level === 1 ? 0.18 : d.level === 2 ? 0.22 : d.level === 3 ? 0.18 : 0.16
-          const levelRimWave = d.level === 1 ? 0.12 : d.level === 2 ? 0.16 : d.level === 3 ? 0.14 : 0.12
-          const levelRimAudio = d.level === 1 ? 0.08 : d.level === 2 ? 0.12 : d.level === 3 ? 0.1 : 0.08
-          const levelRimCap = d.level === 1 ? 0.38 : d.level === 2 ? 0.48 : d.level === 3 ? 0.4 : 0.34
+          const levelHaloBase = d.level === 1 ? 0.12 : d.level === 2 ? 0.15 : d.level === 3 ? 0.12 : 0.1
+          const levelHaloWave = d.level === 1 ? 0.35 : d.level === 2 ? 0.4 : d.level === 3 ? 0.38 : 0.32
+          const levelHaloAudio = d.level === 1 ? 0.12 : d.level === 2 ? 0.18 : d.level === 3 ? 0.15 : 0.12
+          const levelHaloCap = d.level === 1 ? 0.6 : d.level === 2 ? 0.7 : d.level === 3 ? 0.65 : 0.55
+          const levelRimBase = d.level === 1 ? 0.15 : d.level === 2 ? 0.18 : d.level === 3 ? 0.15 : 0.12
+          const levelRimWave = d.level === 1 ? 0.4 : d.level === 2 ? 0.45 : d.level === 3 ? 0.42 : 0.38
+          const levelRimAudio = d.level === 1 ? 0.15 : d.level === 2 ? 0.2 : d.level === 3 ? 0.18 : 0.15
+          const levelRimCap = d.level === 1 ? 0.7 : d.level === 2 ? 0.8 : d.level === 3 ? 0.75 : 0.65
           const haloFillOp = Math.min(levelHaloBase + ringWave * levelHaloWave + audioOpacityBoost * levelHaloAudio, levelHaloCap)
           const rimStrokeOp = Math.min(levelRimBase + ringWave * levelRimWave + audioOpacityBoost * levelRimAudio, levelRimCap)
 
           grp.select('circle.gring-halo').attr('opacity', 1).attr('r', baseR * 1.42).attr('fill-opacity', haloFillOp)
           grp.select('circle.gring-rim').attr('opacity', 1).attr('r', baseR * 1.68).attr('stroke-opacity', rimStrokeOp)
 
-          const bodyPulseStrokeWidth = nodeStrokeWidth(d.level) * (1.32 + ringWave * 0.82 + bass * 0.16)
-          const bodyPulseStrokeOpacity = Math.min(1, 0.9 + ringWave * 0.1)
+          const bodyPulseStrokeWidth = nodeStrokeWidth(d.level) * (1.2 + ringWave * 1.2 + bass * 0.6)
+          const bodyPulseStrokeOpacity = Math.min(1, 0.75 + ringWave * 0.25)
           const bodyPulseFillOpacity = d.level <= 2
-            ? Math.min(0.44, 0.18 + ringWave * 0.2 + energy * 0.08)
-            : Math.min(0.36, 0.14 + ringWave * 0.16 + energy * 0.06)
+            ? Math.min(0.7, 0.15 + ringWave * 0.35 + energy * 0.35)
+            : Math.min(0.6, 0.12 + ringWave * 0.3 + energy * 0.3)
           const pulseBodyColor = isLeafLevel(d.level) ? d3.interpolateRgb(d.color, '#cfe2ff')(0.72) : d.color
           grp.select('circle.nbody')
             .attr('stroke-width', bodyPulseStrokeWidth)
@@ -218,14 +218,14 @@ export function useAtlasGraph({
           }
 
           if (d.level <= 2) {
-            const coreScale = 1 + ringWave * (d.level === 1 ? 0.18 : 0.24) + bass * 0.08
-            grp.select('circle.ncore').attr('r', baseR * 0.38 * coreScale).attr('fill-opacity', 0.84 + ringWave * 0.16)
+            const coreScale = 1 + ringWave * (d.level === 1 ? 0.3 : 0.35) + bass * 0.4
+            grp.select('circle.ncore').attr('r', baseR * 0.38 * coreScale).attr('fill-opacity', 0.7 + ringWave * 0.3)
           }
 
           if (isLeafLevel(d.level)) {
-            const bodyScale = 1 + ringWave * 0.14 + energy * 0.06
+            const bodyScale = 1 + ringWave * 0.22 + energy * 0.35
             grp.select('circle.nbody').attr('r', baseR * bodyScale)
-            grp.select('circle.ncold').attr('r', baseR * (d.level === 3 ? 0.42 : 0.34) * (1 + ringWave * 0.18)).attr('fill-opacity', d.level === 3 ? 0.84 + ringWave * 0.14 : 0.74 + ringWave * 0.12)
+            grp.select('circle.ncold').attr('r', baseR * (d.level === 3 ? 0.42 : 0.34) * (1 + ringWave * 0.28 + energy * 0.15)).attr('fill-opacity', d.level === 3 ? 0.7 + ringWave * 0.25 : 0.6 + ringWave * 0.22)
           }
         })
 
