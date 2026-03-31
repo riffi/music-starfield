@@ -1,4 +1,5 @@
 export const PROXIED_STREAM_HOSTS = [
+  'mscp4.live-streams.nl',
   'radio.hearme.fm',
   'station-sound.ru',
   '5.restream.one',

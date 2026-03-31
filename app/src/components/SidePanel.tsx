@@ -2,6 +2,38 @@ import { getStationStyleLabels } from '../data/selectors'
 import type { AtlasNode, AtlasStation } from '../data/atlas'
 import { levelLabels } from '../app/constants'
 
+function SparkIcon() {
+  return (
+    <svg className="panel-inline-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M8 1.5 9.5 6.5 14.5 8 9.5 9.5 8 14.5 6.5 9.5 1.5 8 6.5 6.5 8 1.5Z" fill="currentColor" />
+    </svg>
+  )
+}
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M4 4 12 12M12 4 4 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function PlayIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M5 3.5v9l7-4.5-7-4.5Z" fill="currentColor" />
+    </svg>
+  )
+}
+
+function PauseIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M5 3.5h2.5v9H5zM8.5 3.5H11v9H8.5z" fill="currentColor" />
+    </svg>
+  )
+}
+
 type SidePanelProps = {
   open: boolean
   hasPlayer: boolean
@@ -37,14 +69,19 @@ export function SidePanel({
           <span className="panel-hdr-code">Sector / {selectedNode?.id ?? 'awaiting-lock'}</span>
         </div>
         <div id="p-name">{selectedNode?.name ?? 'Genre'}</div>
-        <button id="p-close" title="Close" onClick={onClose}>✕</button>
+        <button id="p-close" title="Close" aria-label="Close panel" onClick={onClose}>
+          <CloseIcon />
+        </button>
       </div>
       <div id="p-body">
         {!selectedNode ? null : panelStations.length ? (
           <>
             {childCount ? (
               <div className="panel-note">
-                <span style={{ color: 'var(--gold)' }}>✦</span> Contains {childCount} sub-genre{childCount !== 1 ? 's' : ''}. Click the star to expand.
+                <span className="panel-note-icon" aria-hidden="true">
+                  <SparkIcon />
+                </span>
+                <span>Contains {childCount} sub-genre{childCount !== 1 ? 's' : ''}. Click the star to expand.</span>
               </div>
             ) : null}
             <div className="panel-section-label">
@@ -61,7 +98,7 @@ export function SidePanel({
                   <div className="s-head">
                     <div className="s-name">{station.name}</div>
                     <button className={`pbtn${active ? ' on' : ''}${loading ? ' loading' : ''}`} onClick={() => onPlayStation(station)}>
-                      {loading ? <span className="btn-spinner" /> : active && playing ? '⏸' : '▶'}
+                      {loading ? <span className="btn-spinner" /> : active && playing ? <PauseIcon /> : <PlayIcon />}
                     </button>
                   </div>
                   {station.description ? (
@@ -75,7 +112,7 @@ export function SidePanel({
                     {styleLabels.descriptors.length ? <span className="s-taxonomy-row">Descriptors: {styleLabels.descriptors.join(' • ')}</span> : null}
                   </div>
                   <div className="s-meta">
-                    <span className="s-country">{station.countryLabel === 'US' ? '🇺🇸 US' : station.countryLabel}</span>
+                    <span className="s-country">{station.countryLabel}</span>
                     <span className="s-br">{station.bitrateLabel}</span>
                   </div>
                 </div>

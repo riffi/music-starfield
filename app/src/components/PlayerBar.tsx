@@ -1,6 +1,46 @@
 import { type CSSProperties, type RefObject, useEffect, useState } from 'react'
 import { PL_DECO_IDLE_HEIGHTS } from '../app/audio'
 
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M4 4 12 12M12 4 4 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function PlayIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M5 3.5v9l7-4.5-7-4.5Z" fill="currentColor" />
+    </svg>
+  )
+}
+
+function PauseIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M5 3.5h2.5v9H5zM8.5 3.5H11v9H8.5z" fill="currentColor" />
+    </svg>
+  )
+}
+
+function StopIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M4.5 4.5h7v7h-7z" fill="currentColor" />
+    </svg>
+  )
+}
+
+function SettingsIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M6.6 1.9h2.8l.4 1.5c.3.1.7.2 1 .4l1.4-.7 1.4 1.4-.7 1.4c.2.3.3.7.4 1l1.5.4v2.8l-1.5.4c-.1.3-.2.7-.4 1l.7 1.4-1.4 1.4-1.4-.7c-.3.2-.7.3-1 .4l-.4 1.5H6.6l-.4-1.5c-.3-.1-.7-.2-1-.4l-1.4.7-1.4-1.4.7-1.4c-.2-.3-.3-.7-.4-1l-1.5-.4V6.7l1.5-.4c.1-.3.2-.7.4-1l-.7-1.4L3.8 2.5l1.4.7c.3-.2.7-.3 1-.4l.4-1.5Zm1.4 3.7a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8Z" fill="currentColor" />
+    </svg>
+  )
+}
+
 type PlayerBarProps = {
   orreryRef: RefObject<SVGCircleElement | null>
   currentGenre: string
@@ -67,7 +107,7 @@ export function PlayerBar({
               <div className="player-settings-title">Station Volume</div>
             </div>
             <button className="player-settings-close" type="button" aria-label="Close sound settings" onClick={() => setSettingsOpen(false)}>
-              ×
+              <CloseIcon />
             </button>
           </div>
           <div className="player-settings-copy">
@@ -147,9 +187,11 @@ export function PlayerBar({
         </div>
         <div className="pl-ctrls">
           <button className={`cbtn${playing ? ' on' : ''}${loading ? ' loading' : ''}`} id="cb-pause" title="Pause / Resume" onClick={onToggleAudio}>
-            {loading ? <span className="btn-spinner" /> : playing ? '⏸' : '▶'}
+            {loading ? <span className="btn-spinner" /> : playing ? <PauseIcon /> : <PlayIcon />}
           </button>
-          <button className="cbtn" id="cb-stop" title="Stop" onClick={onStopAudio}>⏹</button>
+          <button className="cbtn" id="cb-stop" title="Stop" onClick={onStopAudio}>
+            <StopIcon />
+          </button>
           <button
             className={`cbtn cbtn-settings${settingsOpen ? ' on' : ''}`}
             type="button"
@@ -157,7 +199,7 @@ export function PlayerBar({
             aria-label="Open sound settings"
             onClick={() => setSettingsOpen((value) => !value)}
           >
-            ⚙
+            <SettingsIcon />
           </button>
         </div>
         <div className="vol-wrap">

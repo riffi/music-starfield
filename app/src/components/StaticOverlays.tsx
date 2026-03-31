@@ -1,11 +1,17 @@
 export function StaticOverlays() {
+  const HintIcon = () => (
+    <svg className="hint-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M8 1.5 9.5 6.5 14.5 8 9.5 9.5 8 14.5 6.5 9.5 1.5 8 6.5 6.5 8 1.5Z" fill="currentColor" />
+    </svg>
+  )
+
   return (
     <>
       <div id="hints">
-        <div>✦ Click a constellation to reveal stars</div>
-        <div>✦ Click again to collapse</div>
-        <div>✦ Click any star for radio stations</div>
-        <div>✦ Drag &amp; scroll to navigate</div>
+        <div><HintIcon /> <span>Click a constellation to reveal stars</span></div>
+        <div><HintIcon /> <span>Click again to collapse</span></div>
+        <div><HintIcon /> <span>Click any star for radio stations</span></div>
+        <div><HintIcon /> <span>Drag &amp; scroll to navigate</span></div>
       </div>
 
       <svg id="compass" width="60" height="60" viewBox="0 0 60 60">
