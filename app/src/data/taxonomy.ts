@@ -343,7 +343,7 @@ export const stationBindings: StationBinding[] = [
   {
     id: 'record-ambient',
     name: 'Рекорд Эмбиент',
-    streamUrl: 'https://radiorecord.hostingradio.ru/ambient96.aacp',
+    streamUrl: 'http://radiorecord.hostingradio.ru/ambient96.aacp',
     countryLabel: 'RU',
     bitrateLabel: '96k',
     primaryStyleId: 'ambient',
@@ -413,7 +413,7 @@ export const stationBindings: StationBinding[] = [
   {
     id: 'record-chillout',
     name: 'Рекорд Чилаут',
-    streamUrl: 'https://radiorecord.hostingradio.ru/chil96.aacp',
+    streamUrl: 'http://radiorecord.hostingradio.ru/chil96.aacp',
     countryLabel: 'RU',
     bitrateLabel: '96k',
     primaryStyleId: 'downtempo',
@@ -432,7 +432,7 @@ export const stationBindings: StationBinding[] = [
   {
     id: 'record-dubstep',
     name: 'Рекорд Дабстеп',
-    streamUrl: 'https://radiorecord.hostingradio.ru/dub96.aacp',
+    streamUrl: 'http://radiorecord.hostingradio.ru/dub96.aacp',
     countryLabel: 'RU',
     bitrateLabel: '96k',
     primaryStyleId: 'dubstep',
@@ -569,6 +569,14 @@ export const stationBindings: StationBinding[] = [
     primaryStyleId: 'liquidfunk',
   },
   {
+    id: 'record-liquid-funk',
+    name: 'Liquid Funk Record Радио',
+    streamUrl: 'http://radiorecord.hostingradio.ru/liquidfunk96.aacp',
+    countryLabel: 'RU',
+    bitrateLabel: '96k',
+    primaryStyleId: 'liquidfunk',
+  },
+  {
     id: 'radio-art-vocal-lounge',
     name: 'Radio Art - Vocal Lounge',
     streamUrl: 'https://live.radioart.com/fVocal_lounge.mp3',
@@ -615,7 +623,7 @@ export const stationBindings: StationBinding[] = [
   {
     id: 'symphony-fm',
     name: 'Симфония FM',
-    streamUrl: 'https://radiorecord.hostingradio.ru/symph96.aacp',
+    streamUrl: 'http://radiorecord.hostingradio.ru/symph96.aacp',
     countryLabel: 'RU',
     bitrateLabel: '96k',
     primaryStyleId: 'classical',

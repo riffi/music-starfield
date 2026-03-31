@@ -4,6 +4,7 @@ import { levelLabels } from '../app/constants'
 
 type SidePanelProps = {
   open: boolean
+  hasPlayer: boolean
   selectedNode: AtlasNode | null
   panelStations: AtlasStation[]
   childCount: number
@@ -16,6 +17,7 @@ type SidePanelProps = {
 
 export function SidePanel({
   open,
+  hasPlayer,
   selectedNode,
   panelStations,
   childCount,
@@ -26,7 +28,7 @@ export function SidePanel({
   onPlayStation,
 }: SidePanelProps) {
   return (
-    <div id="panel" className={open ? 'open' : ''}>
+    <div id="panel" className={`${open ? 'open' : ''}${hasPlayer ? ' has-player' : ''}`}>
       <div id="panel-hdr">
         <div className="panel-scanline" aria-hidden="true" />
         <div className="panel-corners" aria-hidden="true" />

@@ -101,6 +101,7 @@ function App() {
       <svg id="graph-svg" ref={graph.graphRef} />
       <SidePanel
         open={panelOpen}
+        hasPlayer={!!player.currentStationId}
         selectedNode={selectedNode}
         panelStations={panelStations}
         childCount={selectedNode ? (atlasData.childMap[selectedNode.id]?.length ?? 0) : 0}
@@ -122,9 +123,13 @@ function App() {
           playing={player.playing}
           loading={!!player.loadingStationId}
           volume={player.volume}
+          normalizationEnabled={player.normalizationEnabled}
+          normalizationAggression={player.normalizationAggression}
           onToggleAudio={player.toggleAudio}
           onStopAudio={player.stopAudio}
           onVolumeChange={player.setVolume}
+          onNormalizationEnabledChange={player.setNormalizationEnabled}
+          onNormalizationAggressionChange={player.setNormalizationAggression}
         />
       ) : null}
       <StaticOverlays />

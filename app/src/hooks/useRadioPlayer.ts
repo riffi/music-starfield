@@ -17,11 +17,24 @@ type UseRadioPlayerArgs = {
 }
 
 export function useRadioPlayer({ selectedNode }: UseRadioPlayerArgs) {
+  const AUTO_GAIN_TARGET_RMS = 0.18
+  const AUTO_GAIN_SILENCE_THRESHOLD = 0.02
+  const AUTO_GAIN_MIN = 0.72
+  const AUTO_GAIN_MAX = 1.85
+  const AUTO_GAIN_ATTACK = 0.22
+  const AUTO_GAIN_RELEASE = 0.035
+
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const hlsRef = useRef<Hls | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
+  const meterAnalyserRef = useRef<AnalyserNode | null>(null)
   const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null)
+  const compressorRef = useRef<DynamicsCompressorNode | null>(null)
+  const autoGainRef = useRef<GainNode | null>(null)
+  const outputGainRef = useRef<GainNode | null>(null)
+  const normalizationEnabledRef = useRef(true)
+  const normalizationAggressionRef = useRef(55)
   const waveformFrameRef = useRef<number | null>(null)
 
   const [currentStationId, setCurrentStationId] = useState<string | null>(null)
@@ -31,6 +44,8 @@ export function useRadioPlayer({ selectedNode }: UseRadioPlayerArgs) {
   const [currentTrackTitle, setCurrentTrackTitle] = useState('')
   const [playing, setPlaying] = useState(false)
   const [volume, setVolume] = useState(75)
+  const [normalizationEnabled, setNormalizationEnabled] = useState(true)
+  const [normalizationAggression, setNormalizationAggression] = useState(55)
   const [spectrumLevels, setSpectrumLevels] = useState<number[] | null>(null)
 
   const waveformState: 'idle' | 'loading' | 'playing' = loadingStationId ? 'loading' : playing ? 'playing' : 'idle'
@@ -38,6 +53,7 @@ export function useRadioPlayer({ selectedNode }: UseRadioPlayerArgs) {
   function clearCurrentStream() {
     hlsRef.current?.destroy()
     hlsRef.current = null
+    autoGainRef.current?.gain.setValueAtTime(1, audioContextRef.current?.currentTime ?? 0)
     if (!audioRef.current) return
     audioRef.current.pause()
     audioRef.current.removeAttribute('src')
@@ -55,16 +71,48 @@ export function useRadioPlayer({ selectedNode }: UseRadioPlayerArgs) {
       if (audioContextRef.current.state === 'suspended') await audioContextRef.current.resume()
       if (!mediaSourceRef.current) mediaSourceRef.current = audioContextRef.current.createMediaElementSource(audioRef.current)
       if (!analyserRef.current) {
+        const meterAnalyser = audioContextRef.current.createAnalyser()
+        meterAnalyser.fftSize = 1024
+        meterAnalyser.smoothingTimeConstant = 0.12
+
+        const compressor = audioContextRef.current.createDynamicsCompressor()
+        compressor.threshold.value = -22
+        compressor.knee.value = 18
+        compressor.ratio.value = 3
+        compressor.attack.value = 0.008
+        compressor.release.value = 0.22
+
+        const autoGain = audioContextRef.current.createGain()
+        autoGain.gain.value = 1
+
         const analyser = audioContextRef.current.createAnalyser()
         analyser.fftSize = 256
         analyser.smoothingTimeConstant = 0.48
-        mediaSourceRef.current.connect(analyser)
-        analyser.connect(audioContextRef.current.destination)
+
+        const outputGain = audioContextRef.current.createGain()
+        outputGain.gain.value = volume / 100
+
+        mediaSourceRef.current.connect(meterAnalyser)
+        mediaSourceRef.current.connect(compressor)
+        compressor.connect(autoGain)
+        autoGain.connect(analyser)
+        analyser.connect(outputGain)
+        outputGain.connect(audioContextRef.current.destination)
+
+        meterAnalyserRef.current = meterAnalyser
+        compressorRef.current = compressor
+        autoGainRef.current = autoGain
+        outputGainRef.current = outputGain
         analyserRef.current = analyser
+        audioRef.current.volume = 1
       }
       return true
     } catch {
       analyserRef.current = null
+      meterAnalyserRef.current = null
+      compressorRef.current = null
+      autoGainRef.current = null
+      outputGainRef.current = null
       setSpectrumLevels(null)
       return false
     }
@@ -161,12 +209,51 @@ export function useRadioPlayer({ selectedNode }: UseRadioPlayerArgs) {
   }
 
   useEffect(() => {
+    normalizationEnabledRef.current = normalizationEnabled
+  }, [normalizationEnabled])
+
+  useEffect(() => {
+    normalizationAggressionRef.current = normalizationAggression
+  }, [normalizationAggression])
+
+  useEffect(() => {
     if (!audioRef.current) {
       audioRef.current = new Audio()
       audioRef.current.crossOrigin = 'anonymous'
     }
+    if (outputGainRef.current && audioContextRef.current) {
+      outputGainRef.current.gain.setTargetAtTime(volume / 100, audioContextRef.current.currentTime, 0.03)
+      audioRef.current.volume = 1
+      return
+    }
     audioRef.current.volume = volume / 100
   }, [volume])
+
+  useEffect(() => {
+    const compressor = compressorRef.current
+    const audioContext = audioContextRef.current
+    if (!compressor || !audioContext) return
+
+    const time = audioContext.currentTime
+    if (normalizationEnabled) {
+      compressor.threshold.setTargetAtTime(-22, time, 0.05)
+      compressor.knee.setTargetAtTime(18, time, 0.05)
+      compressor.ratio.setTargetAtTime(3, time, 0.05)
+    } else {
+      compressor.threshold.setTargetAtTime(0, time, 0.05)
+      compressor.knee.setTargetAtTime(0, time, 0.05)
+      compressor.ratio.setTargetAtTime(1, time, 0.05)
+    }
+  }, [normalizationEnabled])
+
+  useEffect(() => {
+    const autoGain = autoGainRef.current
+    const audioContext = audioContextRef.current
+    if (!autoGain || !audioContext) return
+    if (!normalizationEnabled) {
+      autoGain.gain.setTargetAtTime(1, audioContext.currentTime, 0.06)
+    }
+  }, [normalizationEnabled])
 
   useEffect(() => {
     return () => {
@@ -179,7 +266,7 @@ export function useRadioPlayer({ selectedNode }: UseRadioPlayerArgs) {
   }, [])
 
   useEffect(() => {
-    if (!playing || !analyserRef.current) {
+    if (!playing || !analyserRef.current || !meterAnalyserRef.current) {
       setSpectrumLevels(null)
       if (waveformFrameRef.current) cancelAnimationFrame(waveformFrameRef.current)
       waveformFrameRef.current = null
@@ -187,12 +274,41 @@ export function useRadioPlayer({ selectedNode }: UseRadioPlayerArgs) {
     }
 
     const analyser = analyserRef.current
+    const meterAnalyser = meterAnalyserRef.current
     const freqData = new Uint8Array(analyser.frequencyBinCount)
+    const waveformData = new Uint8Array(meterAnalyser.fftSize)
     const tick = () => {
       fillAnalyserFrequency(analyser, freqData)
       const levels = computeSpectrumLevels(freqData, SPECTRUM_BAR_COUNT)
       const maxLevel = Math.max(...levels)
       setSpectrumLevels(maxLevel > 0.02 ? levels : null)
+
+      const autoGain = autoGainRef.current
+      const audioContext = audioContextRef.current
+      if (autoGain && audioContext) {
+        meterAnalyser.getByteTimeDomainData(waveformData)
+
+        let sumSquares = 0
+        for (let i = 0; i < waveformData.length; i++) {
+          const sample = (waveformData[i] - 128) / 128
+          sumSquares += sample * sample
+        }
+
+        const rms = Math.sqrt(sumSquares / waveformData.length)
+        const aggression = normalizationAggressionRef.current / 100
+        const targetRms = AUTO_GAIN_TARGET_RMS * (0.7 + aggression * 0.85)
+        const minGain = 1 - (1 - AUTO_GAIN_MIN) * Math.min(1, aggression * 1.2)
+        const maxGain = 1 + (AUTO_GAIN_MAX * 1.75 - 1) * aggression
+        const computedTargetGain =
+          rms < AUTO_GAIN_SILENCE_THRESHOLD ? 1 : Math.max(minGain, Math.min(maxGain, targetRms / rms))
+        const targetGain = normalizationEnabledRef.current ? computedTargetGain : 1
+        const currentGain = autoGain.gain.value
+        const smoothing = targetGain < currentGain ? AUTO_GAIN_ATTACK : AUTO_GAIN_RELEASE
+        const nextGain = currentGain + (targetGain - currentGain) * smoothing
+
+        autoGain.gain.setValueAtTime(nextGain, audioContext.currentTime)
+      }
+
       waveformFrameRef.current = requestAnimationFrame(tick)
     }
     tick()
@@ -255,6 +371,10 @@ export function useRadioPlayer({ selectedNode }: UseRadioPlayerArgs) {
     toggleAudio,
     volume,
     waveformState,
+    normalizationEnabled,
+    normalizationAggression,
+    setNormalizationEnabled,
+    setNormalizationAggression,
     setVolume,
   }
 }
