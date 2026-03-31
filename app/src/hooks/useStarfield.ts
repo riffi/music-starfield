@@ -77,7 +77,7 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
         })
       }
 
-      for (let i = 0; i < 320; i += 1) {
+      for (let i = 0; i < 420; i += 1) {
         const depth = Math.random() * 1.2 + 0.35
         const angle = Math.random() * Math.PI * 2
         const maxSpawnRadius = Math.sqrt(width * width + height * height) * (0.38 + depth * 0.16)
@@ -90,7 +90,7 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
           ph: Math.random() * Math.PI * 2,
           col: Math.random() > 0.88 ? '255,224,170' : Math.random() > 0.58 ? '170,185,255' : '235,238,255',
           depth,
-          glow: Math.random() > 0.975 ? Math.random() * 8 + 6 : 0,
+          glow: Math.random() > 0.985 ? Math.random() * 8 + 6 : 0,
         })
       }
     }

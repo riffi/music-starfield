@@ -44,6 +44,7 @@ export function useRadioPlayer({
   const waveformFrameRef = useRef<number | null>(null)
   const lastSpectrumCommitRef = useRef(0)
   const spectrumLevelsRef = useRef<number[] | null>(null)
+  const smoothedSpectrumLevelsRef = useRef<number[] | null>(null)
 
   const [currentStationId, setCurrentStationId] = useState<string | null>(null)
   const [loadingStationId, setLoadingStationId] = useState<string | null>(null)
@@ -95,7 +96,7 @@ export function useRadioPlayer({
 
         const analyser = audioContextRef.current.createAnalyser()
         analyser.fftSize = 256
-        analyser.smoothingTimeConstant = 0.1
+        analyser.smoothingTimeConstant = 0.42
 
         const outputGain = audioContextRef.current.createGain()
         outputGain.gain.value = volume / 100
@@ -276,6 +277,7 @@ export function useRadioPlayer({
   useEffect(() => {
     if (!playing || !analyserRef.current || !meterAnalyserRef.current) {
       spectrumLevelsRef.current = null
+      smoothedSpectrumLevelsRef.current = null
       lastSpectrumCommitRef.current = 0
       setSpectrumLevels(null)
       if (waveformFrameRef.current) cancelAnimationFrame(waveformFrameRef.current)
@@ -288,6 +290,9 @@ export function useRadioPlayer({
     const freqData = new Uint8Array(analyser.frequencyBinCount)
     const waveformData = new Uint8Array(meterAnalyser.fftSize)
     const SPECTRUM_COMMIT_MS = 1000 / 18
+    const SPECTRUM_ATTACK = 0.42
+    const SPECTRUM_RELEASE = 0.12
+    const SPECTRUM_FLOOR = 0.018
 
     function spectrumChanged(nextLevels: number[] | null, prevLevels: number[] | null) {
       if (nextLevels === null || prevLevels === null) return nextLevels !== prevLevels
@@ -301,8 +306,16 @@ export function useRadioPlayer({
     const tick = () => {
       fillAnalyserFrequency(analyser, freqData)
       const levels = computeSpectrumLevels(freqData, SPECTRUM_BAR_COUNT)
-      const maxLevel = Math.max(...levels)
-      const nextLevels = maxLevel > 0.02 ? levels : null
+      const prevLevels = smoothedSpectrumLevelsRef.current ?? levels.map(() => 0)
+      const smoothedLevels = levels.map((level, index) => {
+        const prev = prevLevels[index] ?? 0
+        const smoothing = level > prev ? SPECTRUM_ATTACK : SPECTRUM_RELEASE
+        const next = prev + (level - prev) * smoothing
+        return next < SPECTRUM_FLOOR ? 0 : next
+      })
+      smoothedSpectrumLevelsRef.current = smoothedLevels
+      const maxLevel = Math.max(...smoothedLevels)
+      const nextLevels = maxLevel > 0.02 ? smoothedLevels : null
       const now = performance.now()
       if (now - lastSpectrumCommitRef.current >= SPECTRUM_COMMIT_MS && spectrumChanged(nextLevels, spectrumLevelsRef.current)) {
         spectrumLevelsRef.current = nextLevels
