@@ -62,6 +62,10 @@ function stationContextPath(station: AtlasStation, selectedNodeId: string | null
   return candidatePaths.slice(1 + station.secondaryStyleIds.length).flat()
 }
 
+export function resolveStationContextPath(station: AtlasStation, selectedNodeId: string | null) {
+  return stationContextPath(station, selectedNodeId)
+}
+
 /**
  * Node ids that should pulse while this station plays: matches how the user reached the station on the graph.
  * If `selectedNodeId` matches the station (same rule as the side panel), pulse that node's branch only.
@@ -78,7 +82,7 @@ export function pulseNodeIdsForPlayingStation(station: AtlasStation | undefined,
 }
 
 /** Root (L1) → … → leaf, along atlas parentId. */
-function orderedPathRootToLeaf(leafId: string): string[] {
+export function orderedPathRootToLeaf(leafId: string): string[] {
   const chain: string[] = []
   let id: string | undefined = leafId
   while (id) {

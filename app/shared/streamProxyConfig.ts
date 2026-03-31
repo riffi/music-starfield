@@ -8,6 +8,7 @@ export const PROXIED_STREAM_HOSTS = [
   '95.47.244.172',
   'us2.maindigitalstream.com',
   'stream02.fmcube.net',
+  'icepool.silvacast.com',
   'radiorecord.hostingradio.ru',
   '79.120.39.202',
 ] as const

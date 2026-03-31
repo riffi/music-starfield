@@ -10,6 +10,9 @@ type UseAtlasGraphArgs = {
   currentStationId: string | null
   playing: boolean
   volume: number
+  searchActive: boolean
+  searchMatchedIds: string[]
+  searchPreviewPathIds: string[]
   audioDataRef: React.MutableRefObject<AudioLevels>
   viewportRef: React.MutableRefObject<ViewportState>
   expandedIds: string[]
@@ -25,6 +28,9 @@ export function useAtlasGraph({
   currentStationId,
   playing,
   volume,
+  searchActive,
+  searchMatchedIds,
+  searchPreviewPathIds,
   audioDataRef,
   viewportRef,
   expandedIds,
@@ -40,10 +46,16 @@ export function useAtlasGraph({
   const flowEdgeKeysRef = useRef<Set<string>>(new Set())
   const expandedIdsRef = useRef<Set<string>>(new Set(expandedIds))
   const pulseVisualsActiveRef = useRef(false)
+  const updateLayoutRef = useRef<((reason?: 'layout' | 'resize') => void) | null>(null)
+  const selectedIdRef = useRef<string | null>(selectedId)
 
   useEffect(() => {
     expandedIdsRef.current = new Set(expandedIds)
   }, [expandedIds])
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId
+  }, [selectedId])
 
   function isLeafLevel(level: RefNode['level']) {
     return level >= 3
@@ -107,7 +119,10 @@ export function useAtlasGraph({
       d3.select(svgEl).selectAll<SVGGElement, RefNode>('g.nd').each(function (d) {
         const grp = d3.select(this)
         const baseR = d.level === 1 ? 27 : d.level === 2 ? 16 : d.level === 3 ? 9 : 7
-        grp.select('circle.gring-halo').attr('opacity', 0)
+        grp.select('circle.gring-halo')
+          .attr('opacity', 0)
+          .attr('data-halo-r', baseR * (d.level === 1 ? 1.46 : d.level === 2 ? 1.5 : 1.44))
+          .attr('data-halo-fill-opacity', 0)
         grp.select('circle.gring-rim').attr('opacity', 0)
         grp.select('circle.nexpand-orbit')
           .attr('r', expandableOrbitRadius(d.level, baseR))
@@ -143,7 +158,7 @@ export function useAtlasGraph({
     }
 
     const tick = (now = 0) => {
-      pt += 0.014
+      pt += 0.009
       const svgEl = graphRef.current
       if (svgEl) {
         const { bass, energy } = audioDataRef.current
@@ -179,7 +194,9 @@ export function useAtlasGraph({
           const pulseThis = pulseIds.size > 0 && pulseIds.has(d.id)
 
           if (!pulseThis) {
-            grp.select('circle.gring-halo').attr('opacity', 0)
+            grp.select('circle.gring-halo')
+              .attr('opacity', 0)
+              .attr('data-halo-fill-opacity', 0)
             grp.select('circle.gring-rim').attr('opacity', 0)
             grp.select('circle.nexpand-orbit')
               .attr('r', expandableOrbitRadius(d.level, baseR))
@@ -199,34 +216,28 @@ export function useAtlasGraph({
           }
 
           const ringFreq = d.level === 1 ? 0.42 : d.level === 2 ? 0.58 : d.level === 3 ? 0.76 : 0.88
-          const ringWave = Math.abs(Math.sin(pt * ringFreq + phase))
-          const levelHaloBase = d.level === 1 ? 0.045 : d.level === 2 ? 0.055 : d.level === 3 ? 0.05 : 0.04
-          const levelHaloWave = d.level === 1 ? 0.11 : d.level === 2 ? 0.14 : d.level === 3 ? 0.125 : 0.1
-          const levelHaloAudio = d.level === 1 ? 0.04 : d.level === 2 ? 0.055 : d.level === 3 ? 0.05 : 0.04
-          const levelHaloCap = d.level === 1 ? 0.17 : d.level === 2 ? 0.2 : d.level === 3 ? 0.18 : 0.16
-          const levelRimBase = d.level === 1 ? 0.055 : d.level === 2 ? 0.07 : d.level === 3 ? 0.06 : 0.05
-          const levelRimWave = d.level === 1 ? 0.12 : d.level === 2 ? 0.15 : d.level === 3 ? 0.13 : 0.11
-          const levelRimAudio = d.level === 1 ? 0.045 : d.level === 2 ? 0.06 : d.level === 3 ? 0.05 : 0.045
-          const levelRimCap = d.level === 1 ? 0.2 : d.level === 2 ? 0.24 : d.level === 3 ? 0.21 : 0.18
-          const haloFillOp = Math.min(levelHaloBase + ringWave * levelHaloWave + audioOpacityBoost * levelHaloAudio, levelHaloCap)
-          const rimStrokeOp = Math.min(levelRimBase + ringWave * levelRimWave + audioOpacityBoost * levelRimAudio, levelRimCap)
-          const haloRadius = baseR * (d.level === 1 ? 1.46 : d.level === 2 ? 1.5 : 1.44) * (1 + ringWave * 0.07 * gainVisualBoost + bass * 0.03 * gainVisualBoost)
-          const rimRadius = baseR * (d.level === 1 ? 1.76 : d.level === 2 ? 1.82 : 1.72) * (1 + ringWave * 0.095 * gainVisualBoost + energy * 0.04 * gainVisualBoost)
-          const rimStrokeWidth = (d.level === 1 ? 0.46 : d.level === 2 ? 0.38 : 0.34) * (1 + ringWave * 0.42 * gainVisualBoost + bass * 0.18 * gainVisualBoost)
+          const ringWave = (Math.sin(pt * ringFreq + phase) + 1) * 0.5
+          const haloFillOp = d.level === 1 ? 0.085 : d.level === 2 ? 0.078 : d.level === 3 ? 0.068 : 0.06
+          const haloRadius = baseR * (d.level === 1 ? 1.46 : d.level === 2 ? 1.5 : 1.44)
 
-          grp.select('circle.gring-halo')
+          const halo = grp.select('circle.gring-halo')
+          const prevHaloRadius = Number(halo.attr('data-halo-r') || haloRadius)
+          const prevHaloOpacity = Number(halo.attr('data-halo-fill-opacity') || haloFillOp)
+          const nextHaloRadius = prevHaloRadius + (haloRadius - prevHaloRadius) * 0.045
+          const nextHaloOpacity = prevHaloOpacity + (haloFillOp - prevHaloOpacity) * 0.035
+
+          halo
             .attr('opacity', 1)
-            .attr('r', haloRadius)
-            .attr('fill-opacity', haloFillOp)
+            .attr('r', nextHaloRadius)
+            .attr('fill-opacity', nextHaloOpacity)
+            .attr('data-halo-r', nextHaloRadius)
+            .attr('data-halo-fill-opacity', nextHaloOpacity)
           grp.select('circle.gring-rim')
-            .attr('opacity', 1)
-            .attr('r', rimRadius)
-            .attr('stroke-width', rimStrokeWidth)
-            .attr('stroke-opacity', rimStrokeOp)
+            .attr('opacity', 0)
           const orbitBaseRadius = expandableOrbitRadius(d.level, baseR)
-          const orbitRadius = orbitBaseRadius * (1 + ringWave * 0.032 * gainVisualBoost + bass * 0.018 * gainVisualBoost)
-          const orbitStrokeOpacity = Math.min(d.level === 1 ? 0.78 : 0.72, (d.level === 1 ? 0.34 : 0.28) + ringWave * 0.24 + audioOpacityBoost * 0.16)
-          const orbitStrokeWidth = (d.level === 1 ? 0.6 : 0.52) * (1.04 + ringWave * 0.28 * gainVisualBoost + bass * 0.1 * gainVisualBoost)
+          const orbitRadius = orbitBaseRadius
+          const orbitStrokeOpacity = d.level === 1 ? 0.4 : 0.32
+          const orbitStrokeWidth = d.level === 1 ? 0.6 : 0.52
           const orbitDashOffset = pt * (d.level === 1 ? -5.8 : d.level === 2 ? -8.5 : -11.5) + phase * 2.6
           grp.select('circle.nexpand-orbit')
             .attr('r', orbitRadius)
@@ -234,11 +245,11 @@ export function useAtlasGraph({
             .attr('stroke-width', orbitStrokeWidth)
             .attr('stroke-dashoffset', orbitDashOffset)
 
-          const bodyPulseStrokeWidth = nodeStrokeWidth(d.level) * (1.08 + ringWave * 1.2 * gainVisualBoost + bass * 0.6 * gainVisualBoost)
-          const bodyPulseStrokeOpacity = Math.min(1, 0.75 + ringWave * 0.25)
+          const bodyPulseStrokeWidth = nodeStrokeWidth(d.level) * (1.02 + ringWave * 0.5 * gainVisualBoost + bass * 0.28 * gainVisualBoost)
+          const bodyPulseStrokeOpacity = Math.min(1, 0.8 + ringWave * 0.12)
           const bodyPulseFillOpacity = d.level <= 2
-            ? Math.min(0.7, 0.15 + ringWave * 0.35 + energy * 0.35)
-            : Math.min(0.6, 0.12 + ringWave * 0.3 + energy * 0.3)
+            ? Math.min(0.62, 0.18 + ringWave * 0.16 + energy * 0.24)
+            : Math.min(0.52, 0.14 + ringWave * 0.14 + energy * 0.2)
           const pulseBodyColor = isLeafLevel(d.level) ? d3.interpolateRgb(d.color, '#cfe2ff')(0.72) : d.color
           grp.select('circle.nbody')
             .attr('stroke-width', bodyPulseStrokeWidth)
@@ -251,14 +262,14 @@ export function useAtlasGraph({
           }
 
           if (d.level <= 2) {
-            const coreScale = 1 + ringWave * (d.level === 1 ? 0.3 : 0.35) * gainVisualBoost + bass * 0.4 * gainVisualBoost
-            grp.select('circle.ncore').attr('r', baseR * 0.38 * coreScale).attr('fill-opacity', 0.7 + ringWave * 0.3)
+            const coreScale = 1 + ringWave * (d.level === 1 ? 0.14 : 0.16) * gainVisualBoost + bass * 0.2 * gainVisualBoost
+            grp.select('circle.ncore').attr('r', baseR * 0.38 * coreScale).attr('fill-opacity', 0.76 + ringWave * 0.12)
           }
 
           if (isLeafLevel(d.level)) {
-            const bodyScale = 1 + ringWave * 0.22 * gainVisualBoost + energy * 0.35 * gainVisualBoost
+            const bodyScale = 1 + ringWave * 0.1 * gainVisualBoost + energy * 0.18 * gainVisualBoost
             grp.select('circle.nbody').attr('r', baseR * bodyScale)
-            grp.select('circle.ncold').attr('r', baseR * (d.level === 3 ? 0.42 : 0.34) * (1 + ringWave * 0.28 * gainVisualBoost + energy * 0.15 * gainVisualBoost)).attr('fill-opacity', d.level === 3 ? 0.7 + ringWave * 0.25 : 0.6 + ringWave * 0.22)
+            grp.select('circle.ncold').attr('r', baseR * (d.level === 3 ? 0.42 : 0.34) * (1 + ringWave * 0.12 * gainVisualBoost + energy * 0.08 * gainVisualBoost)).attr('fill-opacity', d.level === 3 ? 0.76 + ringWave * 0.1 : 0.66 + ringWave * 0.08)
           }
         })
 
@@ -357,7 +368,6 @@ export function useAtlasGraph({
     const flowG = g.append('g')
     const nodeG = g.append('g')
     const labelG = g.append('g')
-    const expanded = expandedIdsRef.current
     let previousGraphActiveRootId: string | null = null
     let previousGraphActiveLevel2Id: string | null = null
 
@@ -381,12 +391,17 @@ export function useAtlasGraph({
     function hasChildren(node: RefNode) {
       return (childrenByParent[node.id]?.length ?? 0) > 0
     }
+    function getExpanded() {
+      return expandedIdsRef.current
+    }
     function getActiveRootId() {
+      const expanded = getExpanded()
       const expandedRoots = rootNodes.filter((root) => expanded.has(root.id))
       return expandedRoots.length === 1 ? expandedRoots[0].id : null
     }
     function getActiveLevel2Id(activeRootId: string | null) {
       if (!activeRootId) return null
+      const expanded = getExpanded()
       const expandedLevel2 = (childrenByParent[activeRootId] ?? []).filter((node) => node.level === 2 && expanded.has(node.id))
       return expandedLevel2.length === 1 ? expandedLevel2[0].id : null
     }
@@ -399,6 +414,7 @@ export function useAtlasGraph({
     }
     function getVisible() {
       function isVisibleBranch(node: RefNode) {
+        const expanded = getExpanded()
         let cursor: RefNode | undefined = node
         while (cursor && cursor.level > 1) {
           if (!cursor.parent) return false
@@ -654,6 +670,7 @@ export function useAtlasGraph({
       setPanelOpen(true)
     }
     function collapseAll(id: string) {
+      const expanded = getExpanded()
       expanded.delete(id)
       nodes.filter((node) => node.parent === id).forEach((node) => collapseAll(node.id))
     }
@@ -666,6 +683,7 @@ export function useAtlasGraph({
     }
     function clickNode(node: RefNode) {
       setHovered(null)
+      const expanded = getExpanded()
       const hasKids = nodes.some((item) => item.parent === node.id)
       const rootId = node.level === 1 ? node.id : getL1(node)?.id
       const shouldCollapseOtherRoots = !!rootId && (node.level === 1 || hasKids)
@@ -771,6 +789,7 @@ export function useAtlasGraph({
         .on('click', (event, d) => { event.stopPropagation(); clickNode(d) })
         .on('mouseover', function (event, d) {
           const hasKids = hasChildren(d)
+          const expanded = getExpanded()
           if (hasKids) {
             d3.select(this).select<SVGCircleElement>('circle.nexpand-orbit')
               .attr('stroke-opacity', 0.48)
@@ -829,18 +848,34 @@ export function useAtlasGraph({
         return nodeBelongsToRoot(source, activeRootId) && nodeBelongsToRoot(target, activeRootId) ? 1 : 0.06
       }
       if (rootDimmingChanged) {
-        activeConstellationSelection.transition().duration(420).style('opacity', (d) => dimConstellationOpacity(d))
-        activeNodeSelection.transition().duration(420).style('opacity', (d) => dimNodeOpacity(d))
-        activeLabelSelection.transition().duration(420).style('opacity', (d) => dimLabelOpacity(d))
-        activeLinkSelection.transition().duration(420).style('opacity', (d) => dimLinkOpacity(d))
+        activeConstellationSelection
+          .attr('data-base-opacity', (d) => String(dimConstellationOpacity(d)))
+          .transition()
+          .duration(420)
+          .style('opacity', (d) => dimConstellationOpacity(d))
+        activeNodeSelection
+          .attr('data-base-opacity', (d) => String(dimNodeOpacity(d)))
+          .transition()
+          .duration(420)
+          .style('opacity', (d) => dimNodeOpacity(d))
+        activeLabelSelection
+          .attr('data-base-opacity', (d) => String(dimLabelOpacity(d)))
+          .transition()
+          .duration(420)
+          .style('opacity', (d) => dimLabelOpacity(d))
+        activeLinkSelection
+          .attr('data-base-opacity', (d) => String(dimLinkOpacity(d)))
+          .transition()
+          .duration(420)
+          .style('opacity', (d) => dimLinkOpacity(d))
       } else {
-        activeConstellationSelection.style('opacity', (d) => dimConstellationOpacity(d))
-        activeNodeSelection.style('opacity', (d) => dimNodeOpacity(d))
-        activeLabelSelection.style('opacity', (d) => dimLabelOpacity(d))
-        activeLinkSelection.style('opacity', (d) => dimLinkOpacity(d))
+        activeConstellationSelection.attr('data-base-opacity', (d) => String(dimConstellationOpacity(d))).style('opacity', (d) => dimConstellationOpacity(d))
+        activeNodeSelection.attr('data-base-opacity', (d) => String(dimNodeOpacity(d))).style('opacity', (d) => dimNodeOpacity(d))
+        activeLabelSelection.attr('data-base-opacity', (d) => String(dimLabelOpacity(d))).style('opacity', (d) => dimLabelOpacity(d))
+        activeLinkSelection.attr('data-base-opacity', (d) => String(dimLinkOpacity(d))).style('opacity', (d) => dimLinkOpacity(d))
       }
 
-      if (selectedId && visibleIds.has(selectedId)) highlight(selectedId)
+      if (selectedIdRef.current && visibleIds.has(selectedIdRef.current)) highlight(selectedIdRef.current)
 
       simulation.nodes(visibleNodes)
       simulation.force<d3.ForceLink<RefNode, RefLink>>('link')?.links(visibleLinks)
@@ -897,6 +932,7 @@ export function useAtlasGraph({
 
     svg.call(zoomBehavior)
     svg.on('click.bg', () => { setPanelOpen(false); deselect() })
+    updateLayoutRef.current = (reason = 'layout') => update(false, reason)
     update(true)
     const timeout = window.setTimeout(() => {
       svg.call(zoomBehavior.transform, d3.zoomIdentity.translate(width() / 2, height() / 2).scale(1).translate(-width() / 2, -height() / 2))
@@ -917,8 +953,72 @@ export function useAtlasGraph({
       simulation.stop()
       svg.on('.zoom', null)
       svg.on('click.bg', null)
+      updateLayoutRef.current = null
     }
   }, [referenceNodes, setExpandedIds, setPanelOpen, setSelectedId, setHovered, viewportRef])
+
+  useEffect(() => {
+    updateLayoutRef.current?.('layout')
+  }, [expandedIds, selectedId])
+
+  useEffect(() => {
+    const svgEl = graphRef.current
+    if (!svgEl) return
+
+    const matchedIds = new Set(searchMatchedIds)
+    const previewIds = new Set(searchPreviewPathIds)
+    const previewEdgeKeys = new Set<string>()
+    for (let index = 0; index < searchPreviewPathIds.length - 1; index += 1) {
+      previewEdgeKeys.add(`${searchPreviewPathIds[index]}>${searchPreviewPathIds[index + 1]}`)
+    }
+
+    const graph = d3.select(svgEl)
+    graph.selectAll<SVGGElement, RefNode>('g.nd').each(function (d) {
+      const group = d3.select(this)
+      const baseOpacity = Number(group.attr('data-base-opacity') ?? 1)
+      const highlighted = matchedIds.has(d.id) || previewIds.has(d.id)
+      const nextOpacity = searchActive ? (highlighted ? baseOpacity : baseOpacity * (d.level === 1 ? 0.36 : 0.14)) : baseOpacity
+
+      group.style('opacity', String(nextOpacity))
+
+      const previewActive = previewIds.has(d.id)
+      group.select('circle.gring-halo')
+        .attr('opacity', previewActive ? 1 : 0)
+        .attr('fill-opacity', previewActive ? (d.level === 1 ? 0.18 : 0.14) : 0)
+      group.select('circle.gring-rim')
+        .attr('opacity', previewActive ? 1 : 0)
+        .attr('stroke-opacity', previewActive ? (d.level === 1 ? 0.34 : 0.28) : 0)
+    })
+
+    graph.selectAll<SVGTextElement, RefNode>('text.lbl').each(function (d) {
+      const label = d3.select(this)
+      const baseOpacity = Number(label.attr('data-base-opacity') ?? 1)
+      const highlighted = matchedIds.has(d.id) || previewIds.has(d.id)
+      const nextOpacity = searchActive ? (highlighted ? baseOpacity : baseOpacity * 0.18) : baseOpacity
+      label.style('opacity', String(nextOpacity))
+    })
+
+    graph.selectAll<SVGLineElement, RefLink>('line.edge').each(function (d) {
+      const line = d3.select(this)
+      const source = typeof d.source === 'object' ? d.source.id : d.source
+      const target = typeof d.target === 'object' ? d.target.id : d.target
+      const key = `${source}>${target}`
+      const baseOpacity = Number(line.attr('data-base-opacity') ?? 1)
+      const highlighted = previewEdgeKeys.has(key) || (matchedIds.has(source) && matchedIds.has(target))
+      const nextOpacity = searchActive ? (highlighted ? Math.max(baseOpacity, 0.38) : baseOpacity * 0.14) : baseOpacity
+      line.style('opacity', String(nextOpacity))
+    })
+
+    graph.selectAll<SVGLineElement, RefLink>('line.edge-constellation').each(function (d) {
+      const line = d3.select(this)
+      const source = typeof d.source === 'object' ? d.source.id : d.source
+      const target = typeof d.target === 'object' ? d.target.id : d.target
+      const baseOpacity = Number(line.attr('data-base-opacity') ?? 0.76)
+      const highlighted = matchedIds.has(source) || matchedIds.has(target)
+      const nextOpacity = searchActive ? (highlighted ? baseOpacity : baseOpacity * 0.14) : baseOpacity
+      line.style('opacity', String(nextOpacity))
+    })
+  }, [searchActive, searchMatchedIds, searchPreviewPathIds])
 
   return { graphRef }
 }
