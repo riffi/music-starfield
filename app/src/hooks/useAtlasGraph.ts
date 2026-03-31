@@ -55,6 +55,13 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
     return 0.62
   }
 
+  function expandableOrbitRadius(level: RefNode['level'], baseRadius: number) {
+    if (level === 1) return baseRadius * 1.3
+    if (level === 2) return baseRadius * 1.42
+    if (level === 3) return baseRadius * 2.08
+    return baseRadius * 2.24
+  }
+
   function withAlpha(color: string, alpha: number) {
     const parsed = d3.color(color)
     if (!parsed) return color
@@ -247,6 +254,9 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
     }
     function nodeBelongsToRoot(node: RefNode, rootId: string) {
       return getL1(node)?.id === rootId
+    }
+    function hasChildren(node: RefNode) {
+      return (childrenByParent[node.id]?.length ?? 0) > 0
     }
     function getActiveRootId() {
       const expandedRoots = rootNodes.filter((root) => expanded.has(root.id))
@@ -592,20 +602,32 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       const nodeSelection = nodeG.selectAll<SVGGElement, RefNode>('g.nd').data(visibleNodes, (d) => d.id)
       const entered = nodeSelection.enter().append('g').attr('class', 'nd').attr('transform', (d) => `translate(${d.x ?? width() / 2},${d.y ?? height() / 2})`).style('opacity', 0).style('cursor', 'pointer')
         .on('click', (event, d) => { event.stopPropagation(); clickNode(d) })
-        .on('mouseover', (event, d) => {
-          const hasKids = nodes.some((item) => item.parent === d.id)
+        .on('mouseover', function (event, d) {
+          const hasKids = hasChildren(d)
+          if (hasKids) {
+            d3.select(this).select<SVGCircleElement>('circle.nexpand-orbit')
+              .attr('stroke-opacity', 0.48)
+              .attr('stroke-width', d.level === 1 ? 0.9 : 0.75)
+          }
           setHovered({ name: d.name, level: levelLabels[d.level], stationCount: d.stations.length, hint: hasKids ? (expanded.has(d.id) ? '↙ Click to collapse' : '↗ Click to expand') : '● Click for stations', x: event.clientX + 14, y: event.clientY - 10 })
         })
         .on('mousemove', (event) => setHovered((prev) => (prev ? { ...prev, x: event.clientX + 14, y: event.clientY - 10 } : prev)))
-        .on('mouseout', () => setHovered(null))
+        .on('mouseout', function (_, d) {
+          if (hasChildren(d)) {
+            d3.select(this).select<SVGCircleElement>('circle.nexpand-orbit')
+              .attr('stroke-opacity', d.level === 1 ? 0.3 : 0.24)
+              .attr('stroke-width', d.level === 1 ? 0.6 : 0.52)
+          }
+          setHovered(null)
+        })
 
       entered.append('circle').attr('class', 'gring-halo').attr('r', (d) => nr(d) * 1.56).attr('fill', (d) => nodeColor(d)).attr('fill-opacity', 0.2).attr('stroke', 'none').attr('opacity', 0).attr('pointer-events', 'none').attr('filter', (d) => (d.level === 1 ? 'url(#pulseHalo10)' : d.level === 2 ? 'url(#pulseHalo6)' : 'url(#pulseHalo3)'))
       entered.append('circle').attr('class', 'gring-rim').attr('r', (d) => nr(d) * 1.9).attr('fill', 'none').attr('stroke', (d) => nodeColor(d)).attr('stroke-width', 0.32).attr('stroke-linecap', 'round').attr('stroke-opacity', 0.15).attr('opacity', 0).attr('pointer-events', 'none')
       entered.filter((d) => d.level === 1).append('circle').attr('class', 'gring-mid-halo').attr('r', (d) => nr(d) * 1.14).attr('fill', (d) => nodeColor(d)).attr('fill-opacity', 0.22).attr('stroke', 'none').attr('opacity', 0).attr('pointer-events', 'none').attr('filter', 'url(#pulseHalo6)')
       entered.filter((d) => d.level === 1).append('circle').attr('class', 'gring-mid-rim').attr('r', (d) => nr(d) * 1.35).attr('fill', 'none').attr('stroke', (d) => nodeColor(d)).attr('stroke-width', 0.28).attr('stroke-linecap', 'round').attr('stroke-opacity', 0.16).attr('opacity', 0).attr('pointer-events', 'none')
       entered.append('circle').attr('class', 'nbody').attr('r', (d) => nr(d)).attr('fill', (d) => (isLeafLevel(d.level) ? withAlpha(level3ColdColor(d), 0.13) : withAlpha(nodeColor(d), 0.13))).attr('stroke', (d) => (isLeafLevel(d.level) ? level3ColdColor(d) : nodeColor(d))).attr('stroke-width', (d) => nodeStrokeWidth(d.level)).attr('filter', (d) => (d.level === 1 ? 'url(#glow6)' : 'url(#glow3)'))
+      entered.filter((d) => hasChildren(d)).append('circle').attr('class', 'nexpand-orbit').attr('r', (d) => expandableOrbitRadius(d.level, nr(d))).attr('fill', 'none').attr('stroke', (d) => nodeColor(d)).attr('stroke-opacity', (d) => (d.level === 1 ? 0.3 : 0.24)).attr('stroke-width', (d) => (d.level === 1 ? 0.6 : 0.52)).attr('stroke-dasharray', (d) => (d.level <= 2 ? '1.8,3.2' : '1.2,2.8')).attr('transform', 'rotate(-14)').attr('pointer-events', 'none')
       entered.filter((d) => d.level <= 2).append('circle').attr('class', 'ncore').attr('r', (d) => nr(d) * 0.38).attr('fill', (d) => nodeColor(d)).attr('filter', 'url(#glow3)')
-      entered.filter((d) => d.level === 2).append('circle').attr('class', 'ncompanion-orbit').attr('r', (d) => nr(d) * 0.74).attr('fill', 'none').attr('stroke', (d) => nodeColor(d)).attr('stroke-opacity', 0.22).attr('stroke-width', 0.45).attr('stroke-dasharray', '1.4,2.4').attr('transform', 'rotate(-18)').attr('pointer-events', 'none')
       entered.filter((d) => d.level === 2).append('circle').attr('class', 'ncompanion').attr('cx', (d) => nr(d) * 0.52).attr('cy', (d) => -nr(d) * 0.24).attr('r', (d) => nr(d) * 0.22).attr('fill', (d) => d3.interpolateRgb(nodeColor(d), '#ffffff')(0.35)).attr('fill-opacity', 0.9).attr('filter', 'url(#glow3)').attr('pointer-events', 'none')
       entered.filter((d) => isLeafLevel(d.level)).append('circle').attr('class', 'ncold').attr('r', (d) => nr(d) * (d.level === 3 ? 0.42 : 0.34)).attr('fill', (d) => level3ColdColor(d)).attr('fill-opacity', (d) => (d.level === 3 ? 0.92 : 0.8)).attr('filter', 'url(#glow3)').attr('pointer-events', 'none')
       entered.filter((d) => d.level === 1).each(function (d) {

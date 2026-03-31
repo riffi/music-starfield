@@ -2,7 +2,7 @@ docType: ui-spec
 format_version: "0.0.3"
 
 metadata:
-  name: music-galaxy
+  name: music-starfield
   description: "Interactive atlas of music styles represented as a navigable graph. Users explore root genres and subgenres, open a selected style, and listen to public online radio stations associated with that style."
   theme: "celestial atlas interface with premium dark mood and glowing constellation accents"
   background: "deep space backdrop with subtle stars and atmospheric gradients"

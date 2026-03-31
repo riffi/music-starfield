@@ -2,7 +2,7 @@ docType: data-spec
 format_version: "0.0.1"
 
 metadata:
-  name: music_galaxy
+  name: music_starfield
   version: "0.1"
   description_short: "Logical graph model for music styles and public radio stations"
 

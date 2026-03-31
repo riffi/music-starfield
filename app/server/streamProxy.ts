@@ -52,7 +52,7 @@ export function handleStreamProxy(req: MiddlewareLikeRequest, res: http.ServerRe
 
   const client = upstreamUrl.protocol === 'https:' ? https : http
   const headers: http.OutgoingHttpHeaders = {
-    'user-agent': req.headers['user-agent'] ?? 'music-galaxy-stream-proxy',
+    'user-agent': req.headers['user-agent'] ?? 'music-starfield-stream-proxy',
     accept: req.headers.accept ?? '*/*',
   }
 

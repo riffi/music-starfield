@@ -1,211 +1,188 @@
-# Music Galaxy
+# Music Starfield
 
-`Music Galaxy` is a curated atlas of music styles and internet radio stations. The app is not a generic streaming directory. It has two connected layers:
+`Music Starfield` is a curated atlas of music styles and internet radio stations. It is not a generic streaming directory. The project has two connected layers:
 
-1. Canonical taxonomy of music genres, styles, descriptors, forms, instruments, and periods.
-2. Curated atlas subset that is rendered in the UI and linked to radio stations.
+1. Canonical taxonomy in `app/src/data/taxonomy.ts`
+2. Derived atlas projection for the UI in `app/src/data/atlas.ts`
 
-This document is the working contract for future agents and maintainers.
+The taxonomy is broader than the visible graph. The UI shows only an editorially selected subset plus the ancestors required to keep visible paths intact.
 
-## Repo Areas
+## Project Layout
 
-- [`app/src/data/taxonomy.ts`](/c:/work/my/music-galaxy/app/src/data/taxonomy.ts): canonical taxonomy and station bindings.
-- [`app/src/data/atlas.ts`](/c:/work/my/music-galaxy/app/src/data/atlas.ts): derived atlas-ready nodes, links, and stations.
-- [`app/src/data/selectors.ts`](/c:/work/my/music-galaxy/app/src/data/selectors.ts): selector/helpers for matching nodes and presenting station style metadata.
-- [`app/src/App.tsx`](/c:/work/my/music-galaxy/app/src/App.tsx): UI and graph rendering.
+- `app/src/data/taxonomy.ts`: source of truth for styles, relations, and stations
+- `app/src/data/atlas.ts`: derived visible atlas nodes, links, and station projection
+- `app/src/data/selectors.ts`: matching helpers and user-facing style labels
+- `app/src/hooks/useAtlasGraph.ts`: graph layout, expansion rules, and node rendering
+- `app/src/hooks/useRadioPlayer.ts`: playback logic and station streaming
+- `app/src/components/*`: UI panels, header, player, tooltip
+- `spec/ui-spec.yaml`: UI specification
+- `spec/data-spec.yaml`: logical data specification
 
-## Core Model
+## Data Model
 
 ### Taxonomy roots
 
-`TaxonomyRoot` is the high-level family. Roots are broader than what is currently shown in the UI. Not every root must be visible in the atlas.
-
-Current roots:
-
-- `ambient_newage`
-- `electronic`
-- `rock`
-- `pop`
-- `hiphop`
-- `rnb_soul_funk`
-- `jazz`
-- `classical`
-- `metal`
-- `punk_hardcore`
-- `folk_country_world`
-- `latin`
-- `reggae_ska_dub`
-- `blues`
-- `soundtrack_stage`
-- `experimental_noise`
+`TaxonomyRoot` is the high-level family for a style. Current roots are defined in `styleTaxonomy` and include visible roots such as `electronic`, `rock`, `jazz`, `classical`, and `instrumental`, plus broader non-visible families.
 
 ### Taxon kinds
 
-Every entry in `styleTaxonomy` has a `kind`:
+Each taxonomy entry has a `kind`:
 
-- `genre`: canonical genre bucket or subgenre.
-- `style`: stylistic subset that still behaves like a style node.
-- `descriptor`: mood/use-case/editorial descriptor. Examples: `chillout`, `cafejazz`, `vocalchillout`.
-- `form`: musical form. Example: `opera`.
-- `instrument`: instrument-centric classification. Example: `piano`.
-- `period`: era or historical period. Example: `baroque`.
+- `genre`
+- `style`
+- `descriptor`
+- `form`
+- `instrument`
+- `period`
 
-Do not model all of these as interchangeable genres.
+Do not treat these as interchangeable. For example, `vocalchillout` is a descriptor, not a genre.
 
-### Levels
+### Canonical taxonomy levels
 
-The graph is a strict 3-level tree:
+Canonical taxonomy currently uses:
 
-- `level: 1`: top-level atlas constellation.
-- `level: 2`: child of a root.
-- `level: 3`: child of a level-2 node.
+- `level: 1` for roots
+- `level: 2` for direct children of roots
+- `level: 3` for deeper taxonomy nodes
 
-If a concept does not fit cleanly into this tree, prefer using `styleRelations` or keeping it non-visible in atlas rather than forcing a bad parent.
+This is source data only. The rendered atlas is a projection and may remap visible depth.
 
-### Atlas visibility
+## Atlas Projection
 
-`isAtlasVisible` controls whether a taxon is intentionally shown in the graph.
+`app/src/data/atlas.ts` is derived data. Do not edit atlas structure directly unless you are changing projection logic.
 
-Rules:
+Current atlas rules:
 
-- Canonical taxonomy can be broader than the rendered atlas.
-- If a node is visible, its ancestors are included automatically by [`atlas.ts`](/c:/work/my/music-galaxy/app/src/data/atlas.ts).
-- Do not mark every taxonomy node visible by default.
-- New roots should stay non-visible unless there is actual editorial/UI intent to expose them.
+- Atlas includes only `isAtlasVisible` nodes plus their ancestors.
+- Atlas nodes can render at `level: 1 | 2 | 3 | 4`.
+- `club` is a synthetic `level 2` cluster under `electronic`.
+- `breakbeat` is a synthetic `level 2` cluster under `electronic`.
+- `house` and `techno` render as `level 3` under `club`.
+- House and techno substyles render as `level 4` under those `level 3` nodes.
+- `breaks` and `drumandbass` render as `level 3` under `breakbeat`.
+- `atmosphericbreaks` and `liquidfunk` render as `level 4` under those `level 3` nodes.
+- `vocalchillout` is projected as `level 4` under `chillout`.
 
-## Station Model
+Important consequence:
 
-Stations are defined in `stationBindings` in [`taxonomy.ts`](/c:/work/my/music-galaxy/app/src/data/taxonomy.ts).
+- Canonical parentage and atlas parentage are not always identical.
+- If you change matching or ancestry behavior, check both `atlas.ts` and `selectors.ts`.
+
+## Stations
+
+Stations live in `stationBindings` in `app/src/data/taxonomy.ts`.
 
 Each station has:
 
-- `primaryStyleId`: the main style or genre used to classify the station.
-- `secondaryStyleIds`: additional genre/style tags.
-- `descriptorIds`: non-genre descriptors such as mood or presentation.
+- `primaryStyleId`
+- optional `secondaryStyleIds`
+- optional `descriptorIds`
 
-This split is intentional. Do not reintroduce a single `styleIds` field.
+Use them as follows:
 
-### Classification rules
+- `primaryStyleId`: what the station mainly is
+- `secondaryStyleIds`: adjacent genres or styles
+- `descriptorIds`: editorial descriptors or mood tags
 
-Use this order when tagging a station:
+Examples from the current model:
 
-1. Pick one `primaryStyleId` that best answers "what is this station mainly?"
-2. Add `secondaryStyleIds` for adjacent genres/styles only.
-3. Add `descriptorIds` for editorial descriptors only.
-
-Examples:
-
-- A station that is mostly downtempo with chill presentation:
-  - `primaryStyleId: 'downtempo'`
-  - `descriptorIds: ['chillout']`
-- A station that is mainly progressive house:
+- progressive house station:
   - `primaryStyleId: 'proghouse'`
   - `secondaryStyleIds: ['house', 'electronic']`
-- A station that is smooth jazz in a cafe mood:
-  - `primaryStyleId: 'smoothjazz'`
-  - `descriptorIds: ['cafejazz']`
+- vocal chillout station:
+  - `primaryStyleId: 'downtempo'`
+  - `descriptorIds: ['vocalchillout']`
+- melodic techno station:
+  - `primaryStyleId: 'melodictechno'`
+  - `secondaryStyleIds: ['techno']`
 
-### What not to do
+Do not reintroduce a flat `styleIds` array.
 
-- Do not tag a station with both a generic root and an unrelated descriptor unless the genre mapping really needs it.
-- Do not use `descriptorIds` for real genres.
-- Do not use `secondaryStyleIds` for forms, instruments, or periods unless there is a clear product reason.
-- Do not add duplicate semantic tags at multiple levels unless the UI/search behavior needs them.
+## Matching And Labels
+
+Selector logic lives in `app/src/data/selectors.ts`.
+
+Current responsibilities:
+
+- `stationMatchesNode(station, nodeId)`: checks whether a station belongs to a node through primary, secondary, or descriptor ancestry
+- `pulseNodeIdsForPlayingStation(...)`: computes branch pulse state for the playing station
+- `computeRadioFlowEdgeKeys(...)`: computes animated flow path in the graph
+- `resolveStyleName(styleId)`: returns display label for atlas and taxonomy ids
+- `getStationStyleLabels(station)`: returns user-facing station metadata labels
+
+If you change atlas parent overrides, update selectors in the same change.
+
+## Expansion Behavior
+
+Graph behavior is implemented in `app/src/hooks/useAtlasGraph.ts`.
+
+Current interaction rules:
+
+- Expanding a node collapses sibling branches under the same parent.
+- Opening a different `level 2` branch collapses previously opened `level 3` and `level 4` descendants from the old branch.
+- Opening a different `level 3` branch collapses the previously open `level 4` branch under the same parent.
+- Nodes with children show a subtle outer orbit as the expandability hint.
 
 ## How To Add A New Style
 
-1. Open [`taxonomy.ts`](/c:/work/my/music-galaxy/app/src/data/taxonomy.ts).
-2. Decide whether the concept is a `genre`, `style`, `descriptor`, `form`, `instrument`, or `period`.
-3. Pick the correct `root`.
-4. Pick the correct `level` and `parentId`.
-5. Add `isAtlasVisible: true` only if the node should be shown in the graph.
-6. Add `styleRelations` if the node needs explicit `parent_of`, `related_to`, `influenced_by`, or `fusion_of` links.
-7. If the style will be used by stations in the current UI, verify that it is atlas-visible or that at least its path to a visible ancestor is intentional.
+1. Edit `app/src/data/taxonomy.ts`.
+2. Choose a stable lowercase ASCII `id`.
+3. Set correct `root`, `kind`, `level`, and `parentId`.
+4. Add `isAtlasVisible: true` only if the style should appear in the graph.
+5. Add `styleRelations` when canonical relations need to stay explicit.
+6. If atlas projection should differ from canonical parentage, update `app/src/data/atlas.ts` and `app/src/data/selectors.ts`.
+7. Run the build.
 
-Checklist for new styles:
+Checklist:
 
-- Parent is semantically correct.
-- Kind is semantically correct.
-- Root is semantically correct.
-- Name is human-readable.
-- ID is stable, lowercase, and ASCII.
-- Visibility is intentional, not accidental.
+- parent is semantically correct
+- kind is semantically correct
+- root is semantically correct
+- visibility is intentional
+- selector ancestry still works
+- atlas projection still makes visual sense
 
 ## How To Add A New Station
 
-1. Open [`taxonomy.ts`](/c:/work/my/music-galaxy/app/src/data/taxonomy.ts).
-2. Add a new object to `stationBindings`.
-3. Fill `id`, `name`, `streamUrl`, `countryLabel`, and `bitrateLabel`.
-4. Pick `primaryStyleId`.
-5. Add optional `secondaryStyleIds`.
-6. Add optional `descriptorIds`.
-7. Make sure every referenced id exists in `styleTaxonomy`.
-8. Run a build.
+1. Edit `stationBindings` in `app/src/data/taxonomy.ts`.
+2. Add `id`, `name`, `streamUrl`, `countryLabel`, and `bitrateLabel`.
+3. Set `primaryStyleId`.
+4. Add optional `secondaryStyleIds`.
+5. Add optional `descriptorIds`.
+6. Verify all referenced style ids exist.
+7. Run the build.
 
-Checklist for new stations:
+Checklist:
 
-- Stream URL is valid and expected to work in browser or through the proxy.
-- Style ids exist.
-- Primary style is specific enough.
-- Descriptors are not used as primary genre unless product intent requires it.
-- Country and bitrate labels are normalized.
+- stream URL is valid
+- style ids exist
+- primary style is specific enough
+- descriptors are not misused as genres
+- country and bitrate labels are normalized
 
-## How Matching Works
+## Validation
 
-Selectors live in [`selectors.ts`](/c:/work/my/music-galaxy/app/src/data/selectors.ts).
-
-Current helpers:
-
-- `stationMatchesNode(station, nodeId)`: returns `true` if the node matches station primary, secondary, or descriptor tags.
-- `resolveStyleName(styleId)`: resolves a style id to the atlas-visible label when available.
-- `getStationStyleLabels(station)`: returns user-facing labels for primary, related, and descriptor groups.
-
-If matching logic changes, update selectors first and keep UI dumb.
-
-## Derived Atlas Rules
-
-[`atlas.ts`](/c:/work/my/music-galaxy/app/src/data/atlas.ts) is derived data. Treat it as a projection layer, not a source of truth.
-
-Rules:
-
-- Source of truth for taxonomy and stations is `taxonomy.ts`.
-- Atlas includes only visible nodes plus their ancestors.
-- UI should prefer selectors and atlas data, not hand-written taxonomy logic in `App.tsx`.
-
-## Validation Workflow
-
-After changing taxonomy or stations, run:
+Run from the app directory:
 
 ```powershell
-cd app
 npm run build
 ```
 
-The build should pass. A Vite chunk-size warning currently exists and is not related to taxonomy changes.
+The build should pass. A Vite chunk-size warning may still appear and is currently expected.
 
 ## Editorial Guidance
 
-The system is curated, not encyclopedic. That means:
+The atlas is curated, not encyclopedic.
 
-- Coverage can be broader than the visible atlas.
-- Visible nodes should have strong editorial value.
-- Avoid adding weak, redundant, or novelty nodes just because a catalog elsewhere has them.
-- Prefer semantic correctness over squeezing a concept into the existing tree.
+- Prefer strong editorial nodes over exhaustive catalog coverage.
+- Do not expose every taxonomy node in the graph.
+- Prefer semantic correctness over forcing a node into a convenient branch.
+- Use projection overrides only when they improve atlas readability without corrupting source taxonomy.
 
 ## Common Mistakes
 
-- Treating descriptors as genres.
-- Putting a style under the wrong parent to satisfy the current graph shape.
-- Marking new nodes visible without any content or editorial need.
-- Adding stations with root-only tagging when a more specific style exists.
-- Reintroducing a flat `styleIds` array in source data.
-
-## If You Need To Expand The System
-
-Preferred order:
-
-1. Extend canonical taxonomy.
-2. Add or fix relations.
-3. Decide whether the new nodes belong in the visible atlas.
-4. Attach stations.
-5. Update selectors/UI only if behavior actually changes.
+- Treating descriptors as genres
+- Editing `atlas.ts` as if it were source data
+- Forgetting to update `selectors.ts` after atlas parent overrides
+- Marking nodes atlas-visible without checking visual impact
+- Adding stations with root-only tagging when a specific style exists
