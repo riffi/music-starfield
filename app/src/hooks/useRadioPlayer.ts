@@ -16,12 +16,16 @@ type UseRadioPlayerArgs = {
   selectedNode: AtlasNode | null
   initialNormalizationEnabled: boolean
   initialNormalizationAggression: number
+  initialFadeInMs: number
+  initialFadeOutMs: number
 }
 
 export function useRadioPlayer({
   selectedNode,
   initialNormalizationEnabled,
   initialNormalizationAggression,
+  initialFadeInMs,
+  initialFadeOutMs,
 }: UseRadioPlayerArgs) {
   const AUTO_GAIN_TARGET_RMS = 0.18
   const AUTO_GAIN_SILENCE_THRESHOLD = 0.02
@@ -29,7 +33,6 @@ export function useRadioPlayer({
   const AUTO_GAIN_MAX = 1.85
   const AUTO_GAIN_ATTACK = 0.22
   const AUTO_GAIN_RELEASE = 0.035
-
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const hlsRef = useRef<Hls | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -38,7 +41,9 @@ export function useRadioPlayer({
   const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null)
   const compressorRef = useRef<DynamicsCompressorNode | null>(null)
   const autoGainRef = useRef<GainNode | null>(null)
+  const playbackGainRef = useRef<GainNode | null>(null)
   const outputGainRef = useRef<GainNode | null>(null)
+  const pauseTimeoutRef = useRef<number | null>(null)
   const normalizationEnabledRef = useRef(initialNormalizationEnabled)
   const normalizationAggressionRef = useRef(initialNormalizationAggression)
   const waveformFrameRef = useRef<number | null>(null)
@@ -55,18 +60,88 @@ export function useRadioPlayer({
   const [volume, setVolume] = useState(75)
   const [normalizationEnabled, setNormalizationEnabled] = useState(initialNormalizationEnabled)
   const [normalizationAggression, setNormalizationAggression] = useState(initialNormalizationAggression)
+  const [fadeInMs, setFadeInMs] = useState(initialFadeInMs)
+  const [fadeOutMs, setFadeOutMs] = useState(initialFadeOutMs)
   const [spectrumLevels, setSpectrumLevels] = useState<number[] | null>(null)
 
   const waveformState: 'idle' | 'loading' | 'playing' = loadingStationId ? 'loading' : playing ? 'playing' : 'idle'
 
   function clearCurrentStream() {
+    if (pauseTimeoutRef.current !== null) {
+      window.clearTimeout(pauseTimeoutRef.current)
+      pauseTimeoutRef.current = null
+    }
     hlsRef.current?.destroy()
     hlsRef.current = null
     autoGainRef.current?.gain.setValueAtTime(1, audioContextRef.current?.currentTime ?? 0)
+    playbackGainRef.current?.gain.setValueAtTime(1, audioContextRef.current?.currentTime ?? 0)
     if (!audioRef.current) return
     audioRef.current.pause()
     audioRef.current.removeAttribute('src')
     audioRef.current.load()
+  }
+
+  function fadePlaybackGain(targetValue: number, fadeDuration: number) {
+    const playbackGain = playbackGainRef.current
+    const audioContext = audioContextRef.current
+    if (!playbackGain || !audioContext) return
+
+    const now = audioContext.currentTime
+    const currentValue = playbackGain.gain.value
+    playbackGain.gain.cancelScheduledValues(now)
+    playbackGain.gain.setValueAtTime(currentValue, now)
+    if (fadeDuration <= 0) {
+      playbackGain.gain.setValueAtTime(targetValue, now)
+      return
+    }
+    playbackGain.gain.linearRampToValueAtTime(targetValue, now + fadeDuration)
+  }
+
+  function fadeInAudio() {
+    if (pauseTimeoutRef.current !== null) {
+      window.clearTimeout(pauseTimeoutRef.current)
+      pauseTimeoutRef.current = null
+    }
+    if (!playbackGainRef.current || !audioContextRef.current) return
+    playbackGainRef.current.gain.setValueAtTime(0.001, audioContextRef.current.currentTime)
+    fadePlaybackGain(1, fadeInMs / 1000)
+  }
+
+  function prepareFadeIn() {
+    if (pauseTimeoutRef.current !== null) {
+      window.clearTimeout(pauseTimeoutRef.current)
+      pauseTimeoutRef.current = null
+    }
+    if (!playbackGainRef.current || !audioContextRef.current) return
+    const now = audioContextRef.current.currentTime
+    playbackGainRef.current.gain.cancelScheduledValues(now)
+    playbackGainRef.current.gain.setValueAtTime(0.001, now)
+  }
+
+  function fadeOutAndPause() {
+    if (!audioRef.current) return
+    if (pauseTimeoutRef.current !== null) {
+      window.clearTimeout(pauseTimeoutRef.current)
+      pauseTimeoutRef.current = null
+    }
+
+    if (!playbackGainRef.current || !audioContextRef.current) {
+      audioRef.current.pause()
+      return
+    }
+
+    if (fadeOutMs <= 0) {
+      playbackGainRef.current.gain.setValueAtTime(0.001, audioContextRef.current.currentTime)
+      audioRef.current.pause()
+      return
+    }
+
+    const fadeDuration = fadeOutMs / 1000
+    fadePlaybackGain(0.001, fadeDuration)
+    pauseTimeoutRef.current = window.setTimeout(() => {
+      audioRef.current?.pause()
+      pauseTimeoutRef.current = null
+    }, Math.ceil(fadeOutMs))
   }
 
   async function ensureAudioAnalyser() {
@@ -98,6 +173,9 @@ export function useRadioPlayer({
         analyser.fftSize = 256
         analyser.smoothingTimeConstant = 0.42
 
+        const playbackGain = audioContextRef.current.createGain()
+        playbackGain.gain.value = 1
+
         const outputGain = audioContextRef.current.createGain()
         outputGain.gain.value = volume / 100
 
@@ -105,12 +183,14 @@ export function useRadioPlayer({
         mediaSourceRef.current.connect(compressor)
         compressor.connect(autoGain)
         autoGain.connect(analyser)
-        analyser.connect(outputGain)
+        analyser.connect(playbackGain)
+        playbackGain.connect(outputGain)
         outputGain.connect(audioContextRef.current.destination)
 
         meterAnalyserRef.current = meterAnalyser
         compressorRef.current = compressor
         autoGainRef.current = autoGain
+        playbackGainRef.current = playbackGain
         outputGainRef.current = outputGain
         analyserRef.current = analyser
         audioRef.current.volume = 1
@@ -121,6 +201,7 @@ export function useRadioPlayer({
       meterAnalyserRef.current = null
       compressorRef.current = null
       autoGainRef.current = null
+      playbackGainRef.current = null
       outputGainRef.current = null
       setSpectrumLevels(null)
       return false
@@ -150,7 +231,9 @@ export function useRadioPlayer({
     }
 
     try {
+      prepareFadeIn()
       await audioRef.current.play()
+      fadeInAudio()
       return true
     } catch {
       return false
@@ -176,9 +259,17 @@ export function useRadioPlayer({
       if (audioRef.current.paused) {
         setLoadingStationId(station.id)
         void ensureAudioAnalyser()
-        void audioRef.current.play().then(() => setPlaying(true)).catch(() => setPlaying(false)).finally(() => setLoadingStationId(null))
+        prepareFadeIn()
+        void audioRef.current
+          .play()
+          .then(() => {
+            fadeInAudio()
+            setPlaying(true)
+          })
+          .catch(() => setPlaying(false))
+          .finally(() => setLoadingStationId(null))
       } else {
-        audioRef.current.pause()
+        fadeOutAndPause()
         setPlaying(false)
       }
       return
@@ -209,10 +300,16 @@ export function useRadioPlayer({
     if (!audioRef.current || !currentStationId) return
     if (audioRef.current.paused) {
       void ensureAudioAnalyser()
-      void audioRef.current.play()
-      setPlaying(true)
+      prepareFadeIn()
+      void audioRef.current
+        .play()
+        .then(() => {
+          fadeInAudio()
+          setPlaying(true)
+        })
+        .catch(() => setPlaying(false))
     } else {
-      audioRef.current.pause()
+      fadeOutAndPause()
       setPlaying(false)
     }
   }
@@ -267,6 +364,7 @@ export function useRadioPlayer({
   useEffect(() => {
     return () => {
       if (waveformFrameRef.current) cancelAnimationFrame(waveformFrameRef.current)
+      if (pauseTimeoutRef.current !== null) window.clearTimeout(pauseTimeoutRef.current)
       hlsRef.current?.destroy()
       hlsRef.current = null
       audioRef.current?.pause()
@@ -413,8 +511,12 @@ export function useRadioPlayer({
     waveformState,
     normalizationEnabled,
     normalizationAggression,
+    fadeInMs,
+    fadeOutMs,
     setNormalizationEnabled,
     setNormalizationAggression,
+    setFadeInMs,
+    setFadeOutMs,
     setVolume,
   }
 }

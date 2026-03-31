@@ -53,11 +53,15 @@ type PlayerBarProps = {
   volume: number
   normalizationEnabled: boolean
   normalizationAggression: number
+  fadeInMs: number
+  fadeOutMs: number
   onToggleAudio: () => void
   onStopAudio: () => void
   onVolumeChange: (value: number) => void
   onNormalizationEnabledChange: (value: boolean) => void
   onNormalizationAggressionChange: (value: number) => void
+  onFadeInChange: (value: number) => void
+  onFadeOutChange: (value: number) => void
 }
 
 export function PlayerBar({
@@ -72,11 +76,15 @@ export function PlayerBar({
   volume,
   normalizationEnabled,
   normalizationAggression,
+  fadeInMs,
+  fadeOutMs,
   onToggleAudio,
   onStopAudio,
   onVolumeChange,
   onNormalizationEnabledChange,
   onNormalizationAggressionChange,
+  onFadeInChange,
+  onFadeOutChange,
 }: PlayerBarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
 
@@ -93,6 +101,8 @@ export function PlayerBar({
 
   const loudnessModeLabel =
     normalizationAggression < 34 ? 'Gentle' : normalizationAggression < 68 ? 'Balanced' : 'Strong'
+  const fadeInLabel = fadeInMs < 80 ? 'Instant' : fadeInMs < 220 ? 'Quick' : fadeInMs < 360 ? 'Soft' : 'Long'
+  const fadeOutLabel = fadeOutMs < 80 ? 'Sharp' : fadeOutMs < 220 ? 'Quick' : fadeOutMs < 360 ? 'Soft' : 'Long'
   const gainStateLabel = volume < 34 ? 'Low' : volume < 68 ? 'Nominal' : 'Hot'
   const gainVisualScale = 0.48 + Math.pow(volume / 100, 0.9) * 0.9
   const gainWaveStyle = {
@@ -116,7 +126,7 @@ export function PlayerBar({
             </button>
           </div>
           <div className="player-settings-copy">
-            Keep quiet and loud stations closer to the same listening level.
+            Tune loudness balancing and how quickly playback eases in or out.
           </div>
           <label className={`player-settings-toggle${normalizationEnabled ? ' on' : ''}`}>
             <input type="checkbox" checked={normalizationEnabled} onChange={(event) => onNormalizationEnabledChange(event.target.checked)} />
@@ -142,6 +152,44 @@ export function PlayerBar({
               <span>Natural</span>
               <span>Balanced</span>
               <span>Level</span>
+            </div>
+          </div>
+          <div className="player-settings-range">
+            <div className="player-settings-range-head">
+              <span>Fade in</span>
+              <strong>{fadeInLabel} · {fadeInMs} ms</strong>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="600"
+              step="10"
+              value={fadeInMs}
+              onChange={(event) => onFadeInChange(Number(event.target.value))}
+            />
+            <div className="player-settings-range-scale" aria-hidden="true">
+              <span>Snap</span>
+              <span>Glide</span>
+              <span>Slow</span>
+            </div>
+          </div>
+          <div className="player-settings-range">
+            <div className="player-settings-range-head">
+              <span>Fade out</span>
+              <strong>{fadeOutLabel} · {fadeOutMs} ms</strong>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="600"
+              step="10"
+              value={fadeOutMs}
+              onChange={(event) => onFadeOutChange(Number(event.target.value))}
+            />
+            <div className="player-settings-range-scale" aria-hidden="true">
+              <span>Cut</span>
+              <span>Ease</span>
+              <span>Float</span>
             </div>
           </div>
         </div>

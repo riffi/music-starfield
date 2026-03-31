@@ -6,6 +6,7 @@ import { PlayerBar } from './components/PlayerBar'
 import { SearchOverlay, type SearchResult } from './components/SearchOverlay'
 import { SidePanel } from './components/SidePanel'
 import { StaticOverlays } from './components/StaticOverlays'
+import { readPersistedAppState, writePersistedAppState } from './app/persistedState'
 import type { HoveredNode, RefNode } from './app/types'
 import { atlasData } from './data/atlas'
 import { getStationStyleLabels, orderedPathRootToLeaf, resolveStationContextPath, stationMatchesNode } from './data/selectors'
@@ -29,6 +30,7 @@ function scoreSearchTerm(label: string, query: string) {
 }
 
 function App() {
+  const initialPersistedState = useMemo(() => readPersistedAppState(), [])
   const starfieldRef = useRef<HTMLCanvasElement | null>(null)
   const orreryRef = useRef<SVGCircleElement | null>(null)
   const viewportRef = useRef({
@@ -44,9 +46,9 @@ function App() {
     activeRootGlow: 0,
   })
   const audioDataRef = useRef({ bass: 0, energy: 0 })
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [panelOpen, setPanelOpen] = useState(false)
-  const [expandedIds, setExpandedIds] = useState<string[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(initialPersistedState.graph.selectedNodeId)
+  const [panelOpen, setPanelOpen] = useState(initialPersistedState.graph.panelOpen)
+  const [expandedIds, setExpandedIds] = useState<string[]>(initialPersistedState.graph.expandedNodeIds)
   const [hovered, setHovered] = useState<HoveredNode | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -137,8 +139,10 @@ function App() {
 
   const player = useRadioPlayer({
     selectedNode,
-    initialNormalizationEnabled: false,
-    initialNormalizationAggression: 55,
+    initialNormalizationEnabled: initialPersistedState.audio.normalizationEnabled,
+    initialNormalizationAggression: initialPersistedState.audio.normalizationAggression,
+    initialFadeInMs: initialPersistedState.audio.fadeInMs,
+    initialFadeOutMs: initialPersistedState.audio.fadeOutMs,
   })
 
   const graph = useAtlasGraph({
@@ -186,6 +190,32 @@ function App() {
   useEffect(() => {
     if (!normalizedSearchQuery) setHoveredSearchResultId(null)
   }, [normalizedSearchQuery])
+
+  useEffect(() => {
+    writePersistedAppState({
+      version: initialPersistedState.version,
+      audio: {
+        normalizationEnabled: player.normalizationEnabled,
+        normalizationAggression: player.normalizationAggression,
+        fadeInMs: player.fadeInMs,
+        fadeOutMs: player.fadeOutMs,
+      },
+      graph: {
+        selectedNodeId: selectedId,
+        panelOpen,
+        expandedNodeIds: expandedIds,
+      },
+    })
+  }, [
+    expandedIds,
+    initialPersistedState.version,
+    panelOpen,
+    player.fadeInMs,
+    player.fadeOutMs,
+    player.normalizationAggression,
+    player.normalizationEnabled,
+    selectedId,
+  ])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -255,11 +285,15 @@ function App() {
           volume={player.volume}
           normalizationEnabled={player.normalizationEnabled}
           normalizationAggression={player.normalizationAggression}
+          fadeInMs={player.fadeInMs}
+          fadeOutMs={player.fadeOutMs}
           onToggleAudio={player.toggleAudio}
           onStopAudio={player.stopAudio}
           onVolumeChange={player.setVolume}
           onNormalizationEnabledChange={player.setNormalizationEnabled}
           onNormalizationAggressionChange={player.setNormalizationAggression}
+          onFadeInChange={player.setFadeInMs}
+          onFadeOutChange={player.setFadeOutMs}
         />
       ) : null}
       <StaticOverlays />

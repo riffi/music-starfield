@@ -10,6 +10,8 @@ export type PersistedAppState = {
   audio: {
     normalizationEnabled: boolean
     normalizationAggression: number
+    fadeInMs: number
+    fadeOutMs: number
   }
   graph: {
     selectedNodeId: string | null
@@ -23,6 +25,8 @@ const DEFAULT_PERSISTED_APP_STATE: PersistedAppState = {
   audio: {
     normalizationEnabled: false,
     normalizationAggression: 55,
+    fadeInMs: 160,
+    fadeOutMs: 140,
   },
   graph: {
     selectedNodeId: null,
@@ -134,9 +138,19 @@ function sanitizeAudioState(audioState: unknown) {
     ? audioState.normalizationAggression
     : fallback.normalizationAggression
 
+  const rawFadeInMs = typeof audioState.fadeInMs === 'number'
+    ? audioState.fadeInMs
+    : fallback.fadeInMs
+
+  const rawFadeOutMs = typeof audioState.fadeOutMs === 'number'
+    ? audioState.fadeOutMs
+    : fallback.fadeOutMs
+
   return {
     normalizationEnabled,
     normalizationAggression: Math.max(0, Math.min(100, Math.round(rawAggression))),
+    fadeInMs: Math.max(0, Math.min(600, Math.round(rawFadeInMs))),
+    fadeOutMs: Math.max(0, Math.min(600, Math.round(rawFadeOutMs))),
   }
 }
 
