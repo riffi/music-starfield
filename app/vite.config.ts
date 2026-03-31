@@ -1,7 +1,7 @@
 import type http from 'node:http'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { handleStreamProxy } from './server/streamProxy'
+import { handleStreamProxy } from './server/streamProxy.js'
 
 function streamProxyPlugin() {
   return {
