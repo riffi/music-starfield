@@ -276,10 +276,10 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
           vy: Math.sin(angle) * spd,
           spd,
           len: Math.random() * 100 + 60,
-          alpha: 0.9,
+          alpha: 0.68,
           col: Math.random() > 0.6 ? '255,242,200' : '210,228,255',
           width: Math.random() * 0.9 + 1.1,
-          glow: Math.random() * 4 + 4,
+          glow: Math.random() * 3 + 3.2,
         })
         nextShootAt = t + Math.random() * 8 + 6
       }
@@ -301,9 +301,9 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
 
         const trail = ctx.createLinearGradient(tailX, tailY, star.x, star.y)
         trail.addColorStop(0, `rgba(${star.col},0)`)
-        trail.addColorStop(0.2, `rgba(${star.col},${star.alpha * 0.025})`)
-        trail.addColorStop(0.68, `rgba(${star.col},${star.alpha * 0.22})`)
-        trail.addColorStop(1, `rgba(${star.col},${star.alpha * 0.88})`)
+        trail.addColorStop(0.2, `rgba(${star.col},${star.alpha * 0.018})`)
+        trail.addColorStop(0.68, `rgba(${star.col},${star.alpha * 0.15})`)
+        trail.addColorStop(1, `rgba(${star.col},${star.alpha * 0.58})`)
         ctx.beginPath()
         ctx.moveTo(tailX, tailY)
         ctx.lineTo(star.x, star.y)
@@ -314,8 +314,8 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
 
         const coreTrail = ctx.createLinearGradient(tailX, tailY, star.x, star.y)
         coreTrail.addColorStop(0, `rgba(255,255,255,0)`)
-        coreTrail.addColorStop(0.55, `rgba(255,255,255,${star.alpha * 0.06})`)
-        coreTrail.addColorStop(1, `rgba(255,255,255,${star.alpha * 0.92})`)
+        coreTrail.addColorStop(0.55, `rgba(255,255,255,${star.alpha * 0.04})`)
+        coreTrail.addColorStop(1, `rgba(255,255,255,${star.alpha * 0.62})`)
         ctx.beginPath()
         ctx.moveTo(tailX + (star.x - tailX) * 0.18, tailY + (star.y - tailY) * 0.18)
         ctx.lineTo(star.x, star.y)
@@ -325,8 +325,8 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
         ctx.stroke()
 
         const coma = ctx.createRadialGradient(star.x, star.y, 0, star.x, star.y, star.glow * 1.9)
-        coma.addColorStop(0, `rgba(${star.col},${star.alpha * 0.7})`)
-        coma.addColorStop(0.38, `rgba(${star.col},${star.alpha * 0.18})`)
+        coma.addColorStop(0, `rgba(${star.col},${star.alpha * 0.44})`)
+        coma.addColorStop(0.38, `rgba(${star.col},${star.alpha * 0.1})`)
         coma.addColorStop(1, `rgba(${star.col},0)`)
         ctx.beginPath()
         ctx.arc(star.x, star.y, star.glow * 1.9, 0, Math.PI * 2)
@@ -334,8 +334,8 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
         ctx.fill()
 
         const headGlow = ctx.createRadialGradient(star.x, star.y, 0, star.x, star.y, star.glow)
-        headGlow.addColorStop(0, `rgba(255,255,255,${Math.min(1, star.alpha * 1.05)})`)
-        headGlow.addColorStop(0.35, `rgba(${star.col},${star.alpha * 0.95})`)
+        headGlow.addColorStop(0, `rgba(255,255,255,${Math.min(1, star.alpha * 0.72)})`)
+        headGlow.addColorStop(0.35, `rgba(${star.col},${star.alpha * 0.56})`)
         headGlow.addColorStop(1, `rgba(${star.col},0)`)
         ctx.beginPath()
         ctx.arc(star.x, star.y, star.glow, 0, Math.PI * 2)

@@ -9,6 +9,7 @@ type UseAtlasGraphArgs = {
   referenceNodes: RefNode[]
   currentStationId: string | null
   playing: boolean
+  volume: number
   audioDataRef: React.MutableRefObject<AudioLevels>
   viewportRef: React.MutableRefObject<ViewportState>
   expandedIds: string[]
@@ -23,6 +24,7 @@ export function useAtlasGraph({
   referenceNodes,
   currentStationId,
   playing,
+  volume,
   audioDataRef,
   viewportRef,
   expandedIds,
@@ -150,6 +152,7 @@ export function useAtlasGraph({
         const flowKeys = flowEdgeKeysRef.current
         const flowActive = flowKeys.size > 0
         const animateVisuals = pulseActive || flowActive
+        const gainVisualBoost = 0.42 + Math.pow(volume / 100, 0.85) * 1.08
 
         if (!animateVisuals) {
           if (pulseVisualsActiveRef.current) {
@@ -167,7 +170,7 @@ export function useAtlasGraph({
 
         lastVisualFrameAt = now
         pulseVisualsActiveRef.current = true
-        const audioOpacityBoost = bass * 0.5 + energy * 0.25
+        const audioOpacityBoost = (bass * 0.5 + energy * 0.25) * gainVisualBoost
 
         d3.select(svgEl).selectAll<SVGGElement, RefNode>('g.nd').each(function (d, i) {
           const grp = d3.select(this)
@@ -207,9 +210,9 @@ export function useAtlasGraph({
           const levelRimCap = d.level === 1 ? 0.2 : d.level === 2 ? 0.24 : d.level === 3 ? 0.21 : 0.18
           const haloFillOp = Math.min(levelHaloBase + ringWave * levelHaloWave + audioOpacityBoost * levelHaloAudio, levelHaloCap)
           const rimStrokeOp = Math.min(levelRimBase + ringWave * levelRimWave + audioOpacityBoost * levelRimAudio, levelRimCap)
-          const haloRadius = baseR * (d.level === 1 ? 1.46 : d.level === 2 ? 1.5 : 1.44) * (1 + ringWave * 0.07 + bass * 0.03)
-          const rimRadius = baseR * (d.level === 1 ? 1.76 : d.level === 2 ? 1.82 : 1.72) * (1 + ringWave * 0.095 + energy * 0.04)
-          const rimStrokeWidth = (d.level === 1 ? 0.46 : d.level === 2 ? 0.38 : 0.34) * (1 + ringWave * 0.42 + bass * 0.18)
+          const haloRadius = baseR * (d.level === 1 ? 1.46 : d.level === 2 ? 1.5 : 1.44) * (1 + ringWave * 0.07 * gainVisualBoost + bass * 0.03 * gainVisualBoost)
+          const rimRadius = baseR * (d.level === 1 ? 1.76 : d.level === 2 ? 1.82 : 1.72) * (1 + ringWave * 0.095 * gainVisualBoost + energy * 0.04 * gainVisualBoost)
+          const rimStrokeWidth = (d.level === 1 ? 0.46 : d.level === 2 ? 0.38 : 0.34) * (1 + ringWave * 0.42 * gainVisualBoost + bass * 0.18 * gainVisualBoost)
 
           grp.select('circle.gring-halo')
             .attr('opacity', 1)
@@ -221,9 +224,9 @@ export function useAtlasGraph({
             .attr('stroke-width', rimStrokeWidth)
             .attr('stroke-opacity', rimStrokeOp)
           const orbitBaseRadius = expandableOrbitRadius(d.level, baseR)
-          const orbitRadius = orbitBaseRadius * (1 + ringWave * 0.032 + bass * 0.018)
+          const orbitRadius = orbitBaseRadius * (1 + ringWave * 0.032 * gainVisualBoost + bass * 0.018 * gainVisualBoost)
           const orbitStrokeOpacity = Math.min(d.level === 1 ? 0.78 : 0.72, (d.level === 1 ? 0.34 : 0.28) + ringWave * 0.24 + audioOpacityBoost * 0.16)
-          const orbitStrokeWidth = (d.level === 1 ? 0.6 : 0.52) * (1.04 + ringWave * 0.28 + bass * 0.1)
+          const orbitStrokeWidth = (d.level === 1 ? 0.6 : 0.52) * (1.04 + ringWave * 0.28 * gainVisualBoost + bass * 0.1 * gainVisualBoost)
           const orbitDashOffset = pt * (d.level === 1 ? -5.8 : d.level === 2 ? -8.5 : -11.5) + phase * 2.6
           grp.select('circle.nexpand-orbit')
             .attr('r', orbitRadius)
@@ -231,7 +234,7 @@ export function useAtlasGraph({
             .attr('stroke-width', orbitStrokeWidth)
             .attr('stroke-dashoffset', orbitDashOffset)
 
-          const bodyPulseStrokeWidth = nodeStrokeWidth(d.level) * (1.2 + ringWave * 1.2 + bass * 0.6)
+          const bodyPulseStrokeWidth = nodeStrokeWidth(d.level) * (1.08 + ringWave * 1.2 * gainVisualBoost + bass * 0.6 * gainVisualBoost)
           const bodyPulseStrokeOpacity = Math.min(1, 0.75 + ringWave * 0.25)
           const bodyPulseFillOpacity = d.level <= 2
             ? Math.min(0.7, 0.15 + ringWave * 0.35 + energy * 0.35)
@@ -248,14 +251,14 @@ export function useAtlasGraph({
           }
 
           if (d.level <= 2) {
-            const coreScale = 1 + ringWave * (d.level === 1 ? 0.3 : 0.35) + bass * 0.4
+            const coreScale = 1 + ringWave * (d.level === 1 ? 0.3 : 0.35) * gainVisualBoost + bass * 0.4 * gainVisualBoost
             grp.select('circle.ncore').attr('r', baseR * 0.38 * coreScale).attr('fill-opacity', 0.7 + ringWave * 0.3)
           }
 
           if (isLeafLevel(d.level)) {
-            const bodyScale = 1 + ringWave * 0.22 + energy * 0.35
+            const bodyScale = 1 + ringWave * 0.22 * gainVisualBoost + energy * 0.35 * gainVisualBoost
             grp.select('circle.nbody').attr('r', baseR * bodyScale)
-            grp.select('circle.ncold').attr('r', baseR * (d.level === 3 ? 0.42 : 0.34) * (1 + ringWave * 0.28 + energy * 0.15)).attr('fill-opacity', d.level === 3 ? 0.7 + ringWave * 0.25 : 0.6 + ringWave * 0.22)
+            grp.select('circle.ncold').attr('r', baseR * (d.level === 3 ? 0.42 : 0.34) * (1 + ringWave * 0.28 * gainVisualBoost + energy * 0.15 * gainVisualBoost)).attr('fill-opacity', d.level === 3 ? 0.7 + ringWave * 0.25 : 0.6 + ringWave * 0.22)
           }
         })
 
@@ -266,7 +269,7 @@ export function useAtlasGraph({
           const key = `${src.id}>${tgt.id}`
           const line = d3.select(this)
           if (flowActive && flowKeys.has(key)) {
-            line.style('stroke-dasharray', src.level === 1 ? '7,10' : '4,8').style('stroke-dashoffset', '0').style('stroke-opacity', String(Math.min(0.5, 0.22 + audioOpacityBoost * 0.22))).style('stroke-width', String(src.level === 1 ? 1.55 : 1.02))
+            line.style('stroke-dasharray', src.level === 1 ? '7,10' : '4,8').style('stroke-dashoffset', '0').style('stroke-opacity', String(Math.min(0.5, 0.22 + audioOpacityBoost * 0.22))).style('stroke-width', String((src.level === 1 ? 1.55 : 1.02) * (0.92 + gainVisualBoost * 0.12)))
           } else {
             line.style('stroke-dasharray', src.level === 1 ? '5,5' : '2,5').style('stroke-dashoffset', null).style('stroke-opacity', '0.22').style('stroke-width', String(src.level === 1 ? 1.4 : 0.9))
           }
@@ -288,8 +291,8 @@ export function useAtlasGraph({
             const gapLen = Math.max(src.level === 1 ? 34 : 24, len * 0.9)
             const period = dashLen + gapLen
             const flowOff = (pt * (src.level === 1 ? 62 : 54)) % period
-            const flowOpacity = Math.min(0.8, 0.35 + bass * 0.2 + energy * 0.15)
-            const flowWidth = src.level === 1 ? 1.9 : 1.4
+            const flowOpacity = Math.min(0.8, 0.35 + bass * 0.2 * gainVisualBoost + energy * 0.15 * gainVisualBoost)
+            const flowWidth = (src.level === 1 ? 1.9 : 1.4) * (0.92 + gainVisualBoost * 0.12)
             line.style('stroke-dasharray', `${dashLen} ${gapLen}`).style('stroke-dashoffset', String(-flowOff)).style('stroke-opacity', String(flowOpacity)).style('stroke-width', String(flowWidth))
           } else {
             line.style('stroke-dasharray', null).style('stroke-dashoffset', null).style('stroke-opacity', '0').style('stroke-width', '0')
@@ -302,7 +305,7 @@ export function useAtlasGraph({
     return () => {
       if (pulseFrameRef.current) cancelAnimationFrame(pulseFrameRef.current)
     }
-  }, [audioDataRef])
+  }, [audioDataRef, volume])
 
   useEffect(() => {
     const svgEl = graphRef.current
@@ -447,7 +450,8 @@ export function useAtlasGraph({
       const anchorDistance = Math.hypot(parentX - anchorX, parentY - anchorY)
       const orbitBase = parent.level === 2 ? Math.max(74, anchorDistance * 0.44) : Math.max(58, anchorDistance * 0.46)
       const pairOrbitBoost = childCount === 2 ? (parent.level === 2 ? 20 : 12) : 0
-      const childOrbit = orbitBase + pairOrbitBoost + Math.max(0, childCount - 2) * (parent.level === 2 ? 10 : 7) + Math.max(0, siblingCount - 4) * 2
+      const level4OrbitBoost = parent.level === 3 ? 16 : 0
+      const childOrbit = orbitBase + pairOrbitBoost + level4OrbitBoost + Math.max(0, childCount - 2) * (parent.level === 2 ? 10 : 7) + Math.max(0, siblingCount - 4) * 2
       const branchAngle = Math.atan2(parentY - anchorY, parentX - anchorX)
       const branchDirX = Math.cos(branchAngle)
       const branchDirY = Math.sin(branchAngle)
@@ -510,31 +514,44 @@ export function useAtlasGraph({
       }
     }
     function computeRootLayout(activeRootId: string | null) {
-      const focusBoost = activeRootId ? 1.7 : 1
+      const focusBoost = activeRootId ? 1.3 : 1
       const gap = Math.min(0.14, TAU / Math.max(rootNodes.length * 14, 1))
       const totalGap = gap * rootNodes.length
       const availableArc = Math.max(TAU - totalGap, TAU * 0.7)
-      let totalWeight = 0
+      const averageWeight = rootNodes.reduce((sum, root) => sum + (rootWeightById.get(root.id) ?? 1), 0) / Math.max(rootNodes.length, 1)
+      let totalScore = 0
       const weightedRoots = rootNodes.map((root) => {
-        const weight = (rootWeightById.get(root.id) ?? 1) * (activeRootId && root.id === activeRootId ? focusBoost : 1)
-        totalWeight += weight
-        return { root, weight }
+        const weight = rootWeightById.get(root.id) ?? 1
+        const relativeWeight = weight / Math.max(averageWeight, 0.001)
+        const temperedWeight = Math.pow(relativeWeight, 0.42)
+        const labelBoost = 1 + Math.max(-0.03, Math.min(0.1, (root.name.length - 9) * 0.012))
+        const activeBoost = activeRootId && root.id === activeRootId ? focusBoost : 1
+        const score = (0.76 + temperedWeight * 0.24) * labelBoost * activeBoost
+        totalScore += score
+        return { root, score }
       })
       const layout = new Map<string, { angle: number; span: number }>()
       let cursor = -Math.PI / 2
-      for (const { root, weight } of weightedRoots) {
-        const span = availableArc * (weight / Math.max(totalWeight, 0.001))
+      for (const { root, score } of weightedRoots) {
+        const span = availableArc * (score / Math.max(totalScore, 0.001))
         layout.set(root.id, { angle: cursor + span * 0.5, span })
         cursor += span + gap
       }
       return layout
     }
-    function computeLevel2Span(rootSpan: number, childCount: number, isActiveRoot: boolean) {
-      const densityFactor = Math.max(0.56, Math.min(1.32, 4 / Math.max(childCount, 1)))
-      const baseSpan = rootSpan * (isActiveRoot ? 0.92 : 0.88) * densityFactor
-      const minSpan = childCount <= 3 ? 0.78 : childCount <= 5 ? 0.58 : 0.42
-      const activeFloor = childCount <= 3 ? 0.92 : childCount <= 5 ? 0.72 : 0.5
-      return Math.min(Math.PI * 0.88, Math.max(baseSpan, isActiveRoot ? activeFloor : minSpan))
+    function computeLevel2Span(childCount: number, rootWeight: number, isActiveRoot: boolean) {
+      const densityFactor = Math.max(0.82, Math.min(1.14, 4.4 / Math.max(childCount, 1)))
+      const widthBase =
+        childCount <= 1 ? 0.4 :
+        childCount === 2 ? 0.62 :
+        childCount === 3 ? 0.84 :
+        childCount <= 5 ? 1.08 :
+        1.24
+      const weightFactor = 0.98 + Math.min(0.18, Math.max(0, rootWeight - 1) * 0.055)
+      const baseSpan = widthBase * densityFactor * weightFactor * (isActiveRoot ? 1.08 : 1)
+      const minSpan = childCount <= 2 ? 0.42 : childCount === 3 ? 0.64 : childCount <= 5 ? 0.94 : 1.06
+      const activeFloor = childCount <= 2 ? 0.5 : childCount === 3 ? 0.76 : childCount <= 5 ? 1.04 : 1.16
+      return Math.min(Math.PI * 0.94, Math.max(baseSpan, isActiveRoot ? activeFloor : minSpan))
     }
     function computeTargets(visibleNodes: RefNode[], activeRootId: string | null) {
       const targets = new Map<string, { x: number; y: number }>()
@@ -558,8 +575,8 @@ export function useAtlasGraph({
         const rootDirY = Math.sin(rootAngle)
         const rootTanX = Math.cos(rootAngle + Math.PI / 2)
         const rootTanY = Math.sin(rootAngle + Math.PI / 2)
-        const level2Span = computeLevel2Span(rootMeta.span, level2Children.length, isActiveRoot)
-        const level2TangentLimit = Math.tan(level2Span / 2) * baseLevel2Orbit * 0.96
+        const level2Span = computeLevel2Span(level2Children.length, rootWeight, isActiveRoot)
+        const level2TangentLimit = Math.tan(level2Span / 2) * baseLevel2Orbit * 1.08
         level2Children.forEach((child, childIndex) => {
           const level2Offset = distributeOffset(childIndex, level2Children.length)
           const tangentSpread = level2TangentLimit * level2Offset
@@ -792,7 +809,7 @@ export function useAtlasGraph({
       const activeNodeSelection = nodeSelection.merge(entered)
 
       const labelSelection = labelG.selectAll<SVGTextElement, RefNode>('text.lbl').data(visibleNodes, (d) => d.id)
-      const enteredLabels = labelSelection.enter().append('text').attr('class', (d) => `lbl lbl-l${d.level}`).style('font-family', "'Orbitron', sans-serif").style('font-size', (d) => (d.level === 1 ? '13px' : d.level === 2 ? '10px' : d.level === 3 ? '9px' : '8px')).style('font-weight', (d) => (d.level === 1 ? '600' : d.level === 4 ? '400' : '500')).style('fill', (d) => (d.level === 1 ? nodeColor(d) : d.level === 4 ? 'rgba(184,168,136,.82)' : '#b8a888')).style('text-anchor', 'middle').style('pointer-events', 'none').style('letter-spacing', (d) => (d.level === 1 ? '.13em' : d.level === 4 ? '.045em' : '.07em')).attr('dy', (d) => nr(d) + (d.level === 1 ? 20 : d.level === 2 ? 14 : d.level === 3 ? 12 : 10)).text((d) => d.name).style('opacity', 0).transition().duration(500).style('opacity', 1)
+      const enteredLabels = labelSelection.enter().append('text').attr('class', (d) => `lbl lbl-l${d.level}`).style('font-family', "'Orbitron', sans-serif").style('font-size', (d) => (d.level === 1 ? '13px' : d.level === 2 ? '10px' : d.level === 3 ? '9px' : '8px')).style('font-weight', (d) => (d.level === 1 ? '600' : d.level === 4 ? '400' : '500')).style('fill', (d) => (d.level === 1 ? nodeColor(d) : d.level === 4 ? 'rgba(184,168,136,.82)' : '#b8a888')).style('text-anchor', 'middle').style('pointer-events', 'none').style('letter-spacing', (d) => (d.level === 1 ? '.13em' : d.level === 4 ? '.045em' : '.07em')).attr('dy', (d) => nr(d) + (d.level === 1 ? 20 : d.level === 2 ? 14 : d.level === 3 ? 15 : 13)).text((d) => d.name).style('opacity', 0).transition().duration(500).style('opacity', 1)
       const activeLabelSelection = labelSelection.merge(enteredLabels)
       labelSelection.exit().transition().duration(300).style('opacity', 0).remove()
       nodeSelection.exit().transition().duration(300).style('opacity', 0).remove()

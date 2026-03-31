@@ -42,18 +42,24 @@ export function stationMatchesNode(station: AtlasStation, nodeId: string) {
 }
 
 function stationContextPath(station: AtlasStation, selectedNodeId: string | null) {
+  const primaryPath = orderedStylePathToRoot(station.primaryStyleId)
+  const candidatePaths = [
+    primaryPath,
+    ...station.secondaryStyleIds.map((sid) => orderedStylePathToRoot(sid)),
+    ...station.descriptorIds.map((did) => orderedStylePathToRoot(did)),
+  ].filter((path) => path.length)
+
   if (selectedNodeId) {
-    const selectedPath = orderedStylePathToRoot(selectedNodeId)
-    if (selectedPath.length) return selectedPath
+    const matchedPath = candidatePaths.find((path) => path.includes(selectedNodeId))
+    if (matchedPath) return matchedPath
   }
 
-  const primaryPath = orderedStylePathToRoot(station.primaryStyleId)
   if (primaryPath.length) return primaryPath
 
-  const secondaryPath = station.secondaryStyleIds.flatMap((sid) => orderedStylePathToRoot(sid))
+  const secondaryPath = candidatePaths.slice(1, 1 + station.secondaryStyleIds.length).flat()
   if (secondaryPath.length) return secondaryPath
 
-  return station.descriptorIds.flatMap((did) => orderedStylePathToRoot(did))
+  return candidatePaths.slice(1 + station.secondaryStyleIds.length).flat()
 }
 
 /**
@@ -65,7 +71,7 @@ export function pulseNodeIdsForPlayingStation(station: AtlasStation | undefined,
   const next = new Set<string>()
   if (!station) return next
 
-  for (const id of stationContextPath(station, selectedNodeId && stationMatchesNode(station, selectedNodeId) ? selectedNodeId : null)) {
+  for (const id of stationContextPath(station, selectedNodeId)) {
     next.add(id)
   }
   return next
@@ -92,8 +98,7 @@ export function computeRadioFlowEdgeKeys(station: AtlasStation | undefined, sele
   const keys = new Set<string>()
   if (!playing || !station) return keys
 
-  const pathSeed = selectedNodeId && stationMatchesNode(station, selectedNodeId) ? selectedNodeId : null
-  const contextPath = stationContextPath(station, pathSeed)
+  const contextPath = stationContextPath(station, selectedNodeId)
   const leaf = contextPath[0] ?? null
 
   if (!leaf) return keys

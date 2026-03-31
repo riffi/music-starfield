@@ -67,6 +67,7 @@ function App() {
     referenceNodes,
     currentStationId: player.currentStationId,
     playing: player.playing,
+    volume: player.volume,
     audioDataRef,
     viewportRef,
     expandedIds,

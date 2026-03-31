@@ -93,6 +93,11 @@ export function PlayerBar({
 
   const loudnessModeLabel =
     normalizationAggression < 34 ? 'Gentle' : normalizationAggression < 68 ? 'Balanced' : 'Strong'
+  const gainStateLabel = volume < 34 ? 'Low' : volume < 68 ? 'Nominal' : 'Hot'
+  const gainVisualScale = 0.48 + Math.pow(volume / 100, 0.9) * 0.9
+  const gainWaveStyle = {
+    ['--pl-gain' as string]: String(gainVisualScale),
+  } as CSSProperties
 
   return (
     <>
@@ -163,12 +168,12 @@ export function PlayerBar({
           {currentTrackTitle ? <div id="pl-track">Now Playing: {currentTrackTitle}</div> : null}
         </div>
         <div className="pl-visual">
-          <div className="pl-signal">Signal / Live Relay</div>
-          <div className={`pl-wave ${spectrumLevels ? 'pl-wave-real' : `pl-wave-${waveformState}`}`} aria-hidden="true">
+          <div className="pl-signal">Live Readout</div>
+          <div className={`pl-wave ${spectrumLevels ? 'pl-wave-real' : `pl-wave-${waveformState}`}`} style={gainWaveStyle} aria-hidden="true">
             {spectrumLevels ? (
               <div className="pl-spectrum">
                 {spectrumLevels.map((value, index) => {
-                  const height = Math.round(Math.max(6, Math.min(100, 6 + value * 118)))
+                  const height = Math.round(Math.max(6, Math.min(100, 6 + value * 118 * gainVisualScale)))
                   return <div key={index} className="pl-spectrum-bar" style={{ height: `${height}%` }} />
                 })}
               </div>
@@ -203,8 +208,21 @@ export function PlayerBar({
           </button>
         </div>
         <div className="vol-wrap">
-          <span className="vol-ico">Gain</span>
-          <input type="range" id="vol" min="0" max="100" value={volume} onChange={(event) => onVolumeChange(Number(event.target.value))} />
+          <div className="vol-head">
+            <span className="vol-ico">Signal</span>
+            <span className="vol-state">{gainStateLabel}</span>
+          </div>
+          <div className="vol-rail" style={{ ['--vol-value' as string]: String(volume / 100) } as CSSProperties}>
+            <input
+              type="range"
+              id="vol"
+              min="0"
+              max="100"
+              value={volume}
+              aria-label="Signal level"
+              onChange={(event) => onVolumeChange(Number(event.target.value))}
+            />
+          </div>
         </div>
       </div>
     </>
