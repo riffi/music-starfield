@@ -135,6 +135,7 @@ export const styleTaxonomy: StyleTaxon[] = [
 
   { id: 'folk', name: 'Folk', root: 'folk_country_world', kind: 'genre', level: 2, parentId: 'folkcountryworld' },
   { id: 'country', name: 'Country', root: 'folk_country_world', kind: 'genre', level: 2, parentId: 'folkcountryworld', isAtlasVisible: true },
+  { id: 'bluegrass', name: 'Bluegrass', root: 'folk_country_world', kind: 'genre', level: 2, parentId: 'folkcountryworld', isAtlasVisible: true },
   { id: 'world', name: 'World', root: 'folk_country_world', kind: 'genre', level: 2, parentId: 'folkcountryworld' },
 
   { id: 'samba', name: 'Samba', root: 'latin', kind: 'genre', level: 2, parentId: 'latin' },
@@ -179,10 +180,10 @@ export const styleTaxonomy: StyleTaxon[] = [
   { id: 'dreampop', name: 'Dream Pop', root: 'pop', kind: 'genre', level: 3, parentId: 'indiepop', isAtlasVisible: true },
   { id: 'arenarock', name: 'Arena Rock', root: 'rock', kind: 'genre', level: 3, parentId: 'hardrock', isAtlasVisible: true },
 
-  { id: 'contemjazz', name: 'Contemporary Jazz', root: 'jazz', kind: 'genre', level: 3, parentId: 'smoothjazz', isAtlasVisible: true },
-  { id: 'acidjazz', name: 'Acid Jazz', root: 'jazz', kind: 'genre', level: 3, parentId: 'nujazz', isAtlasVisible: true },
-  { id: 'neosouljazz', name: 'Neo Soul Jazz', root: 'jazz', kind: 'genre', level: 3, parentId: 'nujazz', isAtlasVisible: true },
-  { id: 'cafejazz', name: 'Cafe Jazz', root: 'jazz', kind: 'descriptor', level: 3, parentId: 'smoothjazz', isAtlasVisible: true },
+  { id: 'contemjazz', name: 'Contemporary Jazz', root: 'jazz', kind: 'genre', level: 3, parentId: 'smoothjazz' },
+  { id: 'acidjazz', name: 'Acid Jazz', root: 'jazz', kind: 'genre', level: 3, parentId: 'nujazz' },
+  { id: 'neosouljazz', name: 'Neo Soul Jazz', root: 'jazz', kind: 'genre', level: 3, parentId: 'nujazz' },
+  { id: 'cafejazz', name: 'Cafe Jazz', root: 'jazz', kind: 'descriptor', level: 3, parentId: 'smoothjazz' },
 ]
 
 export const styleRelations: StyleRelation[] = [
@@ -238,6 +239,7 @@ export const styleRelations: StyleRelation[] = [
 
   { id: 'folkcountryworld-parent-folk', sourceId: 'folkcountryworld', targetId: 'folk', kind: 'parent_of' },
   { id: 'folkcountryworld-parent-country', sourceId: 'folkcountryworld', targetId: 'country', kind: 'parent_of' },
+  { id: 'folkcountryworld-parent-bluegrass', sourceId: 'folkcountryworld', targetId: 'bluegrass', kind: 'parent_of' },
   { id: 'folkcountryworld-parent-world', sourceId: 'folkcountryworld', targetId: 'world', kind: 'parent_of' },
 
   { id: 'latin-parent-samba', sourceId: 'latin', targetId: 'samba', kind: 'parent_of' },
@@ -342,7 +344,7 @@ export const stationBindings: StationBinding[] = [
   },
   {
     id: 'record-ambient',
-    name: 'Рекорд Эмбиент',
+    name: 'Record Ambient',
     streamUrl: 'http://radiorecord.hostingradio.ru/ambient96.aacp',
     countryLabel: 'RU',
     bitrateLabel: '96k',
@@ -412,7 +414,7 @@ export const stationBindings: StationBinding[] = [
   },
   {
     id: 'record-chillout',
-    name: 'Рекорд Чилаут',
+    name: 'Record Chillout',
     streamUrl: 'http://radiorecord.hostingradio.ru/chil96.aacp',
     countryLabel: 'RU',
     bitrateLabel: '96k',
@@ -431,7 +433,7 @@ export const stationBindings: StationBinding[] = [
   },
   {
     id: 'record-dubstep',
-    name: 'Рекорд Дабстеп',
+    name: 'Record Dubstep',
     streamUrl: 'http://radiorecord.hostingradio.ru/dub96.aacp',
     countryLabel: 'RU',
     bitrateLabel: '96k',
@@ -472,7 +474,7 @@ export const stationBindings: StationBinding[] = [
   },
   {
     id: 'record-melodic-techno',
-    name: 'Melodic Techno Record Радио',
+    name: 'Record Melodic Techno',
     streamUrl: 'https://hls-01-radiorecord.hostingradio.ru/record-melodic/playlist.m3u8',
     countryLabel: 'RU',
     bitrateLabel: 'HLS',
@@ -570,7 +572,7 @@ export const stationBindings: StationBinding[] = [
   },
   {
     id: 'record-liquid-funk',
-    name: 'Liquid Funk Record Радио',
+    name: 'Record Liquid Funk',
     streamUrl: 'http://radiorecord.hostingradio.ru/liquidfunk96.aacp',
     countryLabel: 'RU',
     bitrateLabel: '96k',
@@ -586,7 +588,7 @@ export const stationBindings: StationBinding[] = [
   },
   {
     id: 'record-summer-lounge',
-    name: 'Summer Lounge (Радио Рекорд)',
+    name: 'Summer Lounge (Record Radio)',
     streamUrl: 'https://hls-01-radiorecord.hostingradio.ru/record-summerlounge/playlist.m3u8',
     countryLabel: 'RU',
     bitrateLabel: 'HLS',
@@ -594,7 +596,7 @@ export const stationBindings: StationBinding[] = [
   },
   {
     id: 'record-lofi',
-    name: 'Lo-Fi (Радио Рекорд)',
+    name: 'Lo-Fi (Record Radio)',
     streamUrl: 'https://hls-01-radiorecord.hostingradio.ru/record-lofi/playlist.m3u8',
     countryLabel: 'RU',
     bitrateLabel: 'HLS',
@@ -622,7 +624,7 @@ export const stationBindings: StationBinding[] = [
   },
   {
     id: 'symphony-fm',
-    name: 'Симфония FM',
+    name: 'Symphony FM',
     streamUrl: 'http://radiorecord.hostingradio.ru/symph96.aacp',
     countryLabel: 'RU',
     bitrateLabel: '96k',
@@ -630,7 +632,7 @@ export const stationBindings: StationBinding[] = [
   },
   {
     id: 'orfey',
-    name: 'Орфей',
+    name: 'Orpheus',
     streamUrl: 'https://orfeyfm.hostingradio.ru:8034/orfeyfm128.mp3',
     countryLabel: 'RU',
     bitrateLabel: '128k',
@@ -660,7 +662,15 @@ export const stationBindings: StationBinding[] = [
     countryLabel: 'US',
     bitrateLabel: '128k',
     primaryStyleId: 'alternativerock',
-    secondaryStyleIds: ['rock', 'indierock'],
+    secondaryStyleIds: ['rock'],
+  },
+  {
+    id: 'rock-fm-indie-rock',
+    name: 'ROCK FM INDIE ROCK',
+    streamUrl: 'https://stream.regenbogen2.de/indierock/mp3-128/radiospinner',
+    countryLabel: 'DE',
+    bitrateLabel: '128k',
+    primaryStyleId: 'indierock',
   },
   {
     id: 'broken-neck-radio',
@@ -701,7 +711,14 @@ export const stationBindings: StationBinding[] = [
     countryLabel: 'US',
     bitrateLabel: '128k',
     primaryStyleId: 'postrock',
-    secondaryStyleIds: ['shoegaze'],
+  },
+  {
+    id: 'dkfm-shoegaze-radio',
+    name: 'DKFM Shoegaze Radio',
+    streamUrl: 'https://kathy.torontocast.com:2005/stream',
+    countryLabel: 'US',
+    bitrateLabel: 'MP3',
+    primaryStyleId: 'shoegaze',
   },
   {
     id: 'underground-80s',
@@ -712,39 +729,20 @@ export const stationBindings: StationBinding[] = [
     primaryStyleId: 'alternativerock',
   },
   {
-    id: 'sonic-universe',
-    name: 'SomaFM: Sonic Universe',
-    streamUrl: 'https://ice1.somafm.com/sonicuniverse-128-aac',
-    countryLabel: 'US',
-    bitrateLabel: '128k',
+    id: 'nu-jazz-radio',
+    name: 'Nu Jazz Radio',
+    streamUrl: 'https://stream02.fmcube.net/Nu_Jazz-med',
+    countryLabel: 'RU',
+    bitrateLabel: 'MP3',
     primaryStyleId: 'nujazz',
-    secondaryStyleIds: ['jazz', 'neosouljazz'],
   },
   {
-    id: 'smooth-jazz-global',
-    name: 'SmoothJazz.com Global Radio',
-    streamUrl: 'https://smoothjazz.cdnstream1.com/2585_128.mp3',
-    countryLabel: 'US',
-    bitrateLabel: '128k',
+    id: 'smooth-jazz-radio-france',
+    name: 'Smooth Jazz Radio',
+    streamUrl: 'https://tower.hayva.ru/gbh6i-96',
+    countryLabel: 'FR',
+    bitrateLabel: '96k',
     primaryStyleId: 'smoothjazz',
-    secondaryStyleIds: ['contemjazz'],
-  },
-  {
-    id: 'smooth-jazz-r668',
-    name: 'Смут Джаз (Smooth Jazz)',
-    streamUrl: 'https://smoothjazz.cdnstream1.com/2585_128.mp3',
-    countryLabel: 'US',
-    bitrateLabel: '128k',
-    primaryStyleId: 'smoothjazz',
-  },
-  {
-    id: 'smooth-lounge',
-    name: 'SmoothLounge.com',
-    streamUrl: 'https://smoothjazz.cdnstream1.com/2586_128.mp3',
-    countryLabel: 'US',
-    bitrateLabel: '128k',
-    primaryStyleId: 'acidjazz',
-    descriptorIds: ['cafejazz'],
   },
   {
     id: 'bossa',
@@ -753,7 +751,6 @@ export const stationBindings: StationBinding[] = [
     countryLabel: 'US',
     bitrateLabel: '128k',
     primaryStyleId: 'bossanova',
-    descriptorIds: ['cafejazz'],
   },
   {
     id: 'record-latina',
@@ -786,6 +783,22 @@ export const stationBindings: StationBinding[] = [
     countryLabel: 'DE',
     bitrateLabel: '192k',
     primaryStyleId: 'country',
+  },
+  {
+    id: 'the-porch-radio',
+    name: 'The Porch Radio',
+    streamUrl: 'https://streaming.live365.com/a67541',
+    countryLabel: 'US',
+    bitrateLabel: '128k',
+    primaryStyleId: 'bluegrass',
+  },
+  {
+    id: 'heartland-bluegrass-gospel',
+    name: 'Heartland Public Radio (Bluegrass Gospel)',
+    streamUrl: 'https://us2.maindigitalstream.com/ssl/7739',
+    countryLabel: 'CA',
+    bitrateLabel: '128k',
+    primaryStyleId: 'bluegrass',
   },
   {
     id: 'gotradio-reggae-rasta-roots',

@@ -514,23 +514,28 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
     }
     function clickNode(node: RefNode) {
       const hasKids = nodes.some((item) => item.parent === node.id)
+      const rootId = node.level === 1 ? node.id : getL1(node)?.id
+      const shouldCollapseOtherRoots = !!rootId && (node.level === 1 || hasKids)
       if (hasKids) {
         if (expanded.has(node.id)) collapseAll(node.id)
         else {
-          const rootId = getL1(node)?.id
           if (rootId) collapseOtherRoots(rootId)
           collapseSiblingBranches(node.id, node.parent)
           expanded.add(node.id)
         }
         update(false)
       } else {
+        if (shouldCollapseOtherRoots && rootId) {
+          collapseOtherRoots(rootId)
+          update(false)
+        }
         simulation.stop()
         simulation.alpha(0)
       }
       highlight(node.id)
       refreshPanel(node)
     }
-    function update(initial: boolean) {
+    function update(initial: boolean, reason: 'layout' | 'resize' = 'layout') {
       if (!initial) simulation.stop()
       const { visibleNodes, visibleLinks } = getVisible()
       const constellationLinks = buildConstellationLinks(visibleNodes)
@@ -676,7 +681,7 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       simulation.nodes(visibleNodes)
       simulation.force<d3.ForceLink<RefNode, RefLink>>('link')?.links(visibleLinks)
 
-      if (!initial) {
+      if (!initial && reason !== 'resize') {
         svg.interrupt('graphLayout')
         function applyDescendantLayout() {
           rootNodes.forEach((root) => {
@@ -727,6 +732,17 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
           simulation.alpha(0)
           syncGraphDom()
         })
+      } else if (!initial) {
+        for (const d of visibleNodes) {
+          const tgt = targets.get(d.id)
+          if (!tgt) continue
+          d.x = tgt.x
+          d.y = tgt.y
+          d.vx = 0
+          d.vy = 0
+        }
+        simulation.alpha(0)
+        syncGraphDom()
       } else {
         simulation.alpha(1).restart()
       }
@@ -742,7 +758,9 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
             if (!rootTarget) return d3.zoomIdentity.translate(width() / 2, height() / 2).scale(1).translate(-width() / 2, -height() / 2)
             return d3.zoomIdentity.translate(width() / 2, height() / 2).scale(1.18).translate(-rootTarget.x, -rootTarget.y)
           })()
-      if (focusTargetChanged) svg.transition().duration(initial ? 100 : 700).ease(d3.easeCubicOut).call(zoomBehavior.transform, focusTransform)
+      if (focusTargetChanged || reason === 'resize') {
+        svg.transition().duration(initial ? 100 : reason === 'resize' ? 220 : 700).ease(d3.easeCubicOut).call(zoomBehavior.transform, focusTransform)
+      }
     }
 
     const zoomBehavior = d3.zoom<SVGSVGElement, unknown>().scaleExtent([0.2, 3.5]).on('zoom', (event) => {
@@ -764,12 +782,17 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
     const timeout = window.setTimeout(() => {
       svg.call(zoomBehavior.transform, d3.zoomIdentity.translate(width() / 2, height() / 2).scale(1).translate(-width() / 2, -height() / 2))
     }, 100)
+    let resizeFrame = 0
     const onResize = () => {
-      simulation.force('center', d3.forceCenter(width() / 2, height() / 2))
-      simulation.alpha(0.1).restart()
+      if (resizeFrame) cancelAnimationFrame(resizeFrame)
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = 0
+        update(false, 'resize')
+      })
     }
     window.addEventListener('resize', onResize)
     return () => {
+      if (resizeFrame) cancelAnimationFrame(resizeFrame)
       window.clearTimeout(timeout)
       window.removeEventListener('resize', onResize)
       simulation.stop()
