@@ -496,7 +496,12 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
       nodes.filter((node) => node.parent === id).forEach((node) => collapseAll(node.id))
     }
     function collapseOtherRoots(activeRootId: string) { rootNodes.forEach((root) => { if (root.id !== activeRootId) collapseAll(root.id) }) }
-    function collapseOtherLevel2Branches(activeLevel2Id: string, parentRootId: string | null) { if (!parentRootId) return; (childrenByParent[parentRootId] ?? []).forEach((child) => { if (child.id !== activeLevel2Id) collapseAll(child.id) }) }
+    function collapseSiblingBranches(activeNodeId: string, parentId: string | null) {
+      if (!parentId) return
+      ;(childrenByParent[parentId] ?? []).forEach((child) => {
+        if (child.id !== activeNodeId) collapseAll(child.id)
+      })
+    }
     function clickNode(node: RefNode) {
       const hasKids = nodes.some((item) => item.parent === node.id)
       if (hasKids) {
@@ -504,7 +509,7 @@ export function useAtlasGraph({ referenceNodes, currentStationId, playing, audio
         else {
           const rootId = getL1(node)?.id
           if (rootId) collapseOtherRoots(rootId)
-          if (node.level === 2) collapseOtherLevel2Branches(node.id, node.parent)
+          collapseSiblingBranches(node.id, node.parent)
           expanded.add(node.id)
         }
         update(false)
