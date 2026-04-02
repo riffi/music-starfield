@@ -1,4 +1,6 @@
-import { rootColors, stationBindings, styleTaxonomy, type RelationKind } from './taxonomy'
+import type { RelationKind } from './taxonomy'
+import { stationBindings } from './stations'
+import { rootColors, styleTaxonomy } from './styles'
 
 export type AtlasNode = {
   id: string

@@ -1,5 +1,5 @@
 import { atlasData, type AtlasNode, type AtlasStation } from './atlas'
-import { styleTaxonomy } from './taxonomy'
+import { styleTaxonomy } from './styles'
 
 const BREAKBEAT_CLUSTER_ID = 'breakbeat'
 const CLUB_CLUSTER_ID = 'club'
