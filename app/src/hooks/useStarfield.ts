@@ -79,12 +79,10 @@ export function useStarfield({ canvasRef, analyserRef, audioDataRef, viewportRef
 
       for (let i = 0; i < 420; i += 1) {
         const depth = Math.random() * 1.2 + 0.35
-        const angle = Math.random() * Math.PI * 2
-        const maxSpawnRadius = Math.sqrt(width * width + height * height) * (0.38 + depth * 0.16)
-        const spawnRadius = Math.min(width, height) * 0.04 + Math.pow(Math.random(), 0.58) * maxSpawnRadius
+        const spawnMargin = 80 + depth * 90
         flightStars.push({
-          x: width * 0.5 + Math.cos(angle) * spawnRadius,
-          y: height * 0.5 + Math.sin(angle) * spawnRadius,
+          x: Math.random() * (width + spawnMargin * 2) - spawnMargin,
+          y: Math.random() * (height + spawnMargin * 2) - spawnMargin,
           r: Math.random() > 0.9 ? Math.random() * 1.6 + 1.0 : Math.random() * 0.95 + 0.12,
           op: Math.random() * 0.5 + 0.1,
           ph: Math.random() * Math.PI * 2,

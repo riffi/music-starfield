@@ -695,12 +695,10 @@ export function useAtlasGraph({
           expanded.add(node.id)
         }
         setExpandedIds([...expanded])
-        update(false)
       } else {
         if (shouldCollapseOtherRoots && rootId) {
           collapseOtherRoots(rootId)
           setExpandedIds([...expanded])
-          update(false)
         }
         simulation.stop()
         simulation.alpha(0)
@@ -907,13 +905,9 @@ export function useAtlasGraph({
             return d3.zoomIdentity.translate(width() / 2, height() / 2).scale(1.18).translate(-rootTarget.x, -rootTarget.y)
           })()
       if (focusTargetChanged || reason === 'resize') {
-        if (initial) {
-          svg.transition().duration(100).ease(d3.easeCubicOut).call(zoomBehavior.transform, focusTransform)
-        } else if (reason === 'resize') {
-          svg.transition().duration(220).ease(d3.easeCubicOut).call(zoomBehavior.transform, focusTransform)
-        } else {
-          svg.call(zoomBehavior.transform, focusTransform)
-        }
+        const focusDuration = initial ? 180 : reason === 'resize' ? 240 : 460
+        svg.interrupt()
+        svg.transition().duration(focusDuration).ease(d3.easeCubicInOut).call(zoomBehavior.transform, focusTransform)
       }
     }
 

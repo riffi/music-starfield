@@ -3,84 +3,168 @@ format_version: "0.0.1"
 
 metadata:
   name: music_starfield
-  version: "0.1"
-  description_short: "Logical graph model for music styles and public radio stations"
+  version: "0.2"
+  description_short: "Logical taxonomy, atlas projection, and radio-station model for the Music Starfield explorer"
 
 description: |
-  The system models music styles as graph nodes connected by logical relations.
-  Public online radio stations are linked to one or more styles.
-  Users explore the graph visually, inspect a selected style, and play radio streams
-  associated with that style while continuing to navigate the atlas.
+  The system keeps a canonical music-style taxonomy and derives a curated atlas projection
+  for exploration. Styles belong to broader roots, may have aliases, and are connected by
+  typed relations. Public radio stations are bound to one primary style and can also carry
+  related styles and descriptor tags. The UI consumes a projected atlas that includes only
+  editorially visible branches plus required ancestors and a small number of synthetic
+  cluster nodes used to improve navigation.
 
 enums:
+  taxonomy_root:
+    description: "Top-level editorial family used for color and broad grouping"
+    values:
+      - name: ambient_newage
+        label: "Ambient / New Age"
+      - name: electronic
+        label: "Electronic"
+      - name: rock
+        label: "Rock"
+      - name: pop
+        label: "Pop"
+      - name: hiphop
+        label: "Hip-Hop"
+      - name: rnb_soul_funk
+        label: "R&B / Soul / Funk"
+      - name: jazz
+        label: "Jazz"
+      - name: classical
+        label: "Classical"
+      - name: metal
+        label: "Metal"
+      - name: punk_hardcore
+        label: "Punk / Hardcore"
+      - name: folk_country_world
+        label: "Folk / Country / World"
+      - name: latin
+        label: "Latin"
+      - name: reggae_ska_dub
+        label: "Reggae / Ska / Dub"
+      - name: blues
+        label: "Blues"
+      - name: soundtrack_stage
+        label: "Soundtrack / Stage"
+      - name: instrumental
+        label: "Instrumental"
+      - name: experimental_noise
+        label: "Experimental / Noise"
+
+  taxon_kind:
+    description: "Semantic role of a taxonomy node"
+    values:
+      - name: genre
+        label: "Genre"
+      - name: style
+        label: "Style"
+      - name: descriptor
+        label: "Descriptor"
+      - name: form
+        label: "Form"
+      - name: instrument
+        label: "Instrument"
+      - name: period
+        label: "Period"
+
   style_relation_type:
     description: "Logical meaning of a relation between two music styles"
     values:
       - name: parent_of
         label: "Parent Of"
-        description: "A broader style contains a narrower style as part of its main taxonomy"
+        description: "A broader style contains a narrower style in canonical taxonomy"
       - name: related_to
         label: "Related To"
-        description: "Two styles are strongly related without strict parent-child hierarchy"
+        description: "Two styles are editorially adjacent without strict hierarchy"
       - name: influenced_by
         label: "Influenced By"
-        description: "One style is historically or stylistically influenced by another"
-      - name: adjacent_to
-        label: "Adjacent To"
-        description: "Two styles are near each other in discovery and listening space"
+        description: "One style draws historical or sonic influence from another"
+      - name: fusion_of
+        label: "Fusion Of"
+        description: "A style meaningfully blends traits from another branch"
 
 entities:
   style:
     label: "Style"
-    description: "A music genre, subgenre, or microgenre represented as a graph node"
+    description: "Canonical music taxonomy node used as the source of truth for atlas projection and station mapping"
     fields:
       id:
-        type: uuid
-        pk: true
-      slug:
         type: string
-        required: true
-        unique: true
+        pk: true
       name:
         type: string
         required: true
-      description:
+      root:
+        type: taxonomy_root
+        required: true
+      kind:
+        type: taxon_kind
+        required: true
+      level:
+        type: integer
+        required: true
+      parent_style_id:
         type: string
-      is_root:
+        fk: style.id
+      aliases:
+        type: string[]
+      is_atlas_visible:
         type: boolean
         default: false
-      visual_group:
-        type: string
-      exploration_level:
-        type: integer
 
   style_relation:
     label: "Style Relation"
-    description: "Logical edge between two styles in the graph"
+    description: "Directed semantic relation between two canonical styles"
     fields:
       id:
-        type: uuid
+        type: string
         pk: true
       source_style_id:
-        type: uuid
+        type: string
         required: true
         fk: style.id
       target_style_id:
-        type: uuid
+        type: string
         required: true
         fk: style.id
       relation_type:
         type: style_relation_type
         required: true
-      weight:
-        type: decimal
+
+  atlas_node:
+    label: "Atlas Node"
+    description: "Visible node in the derived exploration atlas. May reference a canonical style or represent a synthetic cluster inserted for navigation clarity."
+    fields:
+      id:
+        type: string
+        pk: true
+      name:
+        type: string
+        required: true
+      source_style_id:
+        type: string
+        fk: style.id
+      parent_atlas_node_id:
+        type: string
+        fk: atlas_node.id
+      level:
+        type: integer
+        required: true
+      color:
+        type: string
+        required: true
+      is_synthetic:
+        type: boolean
+        default: false
 
   radio_station:
     label: "Radio Station"
-    description: "Public online radio stream available for listening"
+    description: "Playable public internet radio stream associated with one primary style plus optional related and descriptor tags"
     fields:
       id:
-        type: uuid
+        type: string
         pk: true
       name:
         type: string
@@ -88,52 +172,81 @@ entities:
       stream_url:
         type: string
         required: true
-      homepage_url:
+      description:
         type: string
       country_label:
         type: string
+        required: true
       bitrate_label:
         type: string
-      is_public:
-        type: boolean
-        default: true
-      is_active:
-        type: boolean
-        default: true
-
-  station_style:
-    label: "Station Style Mapping"
-    description: "Mapping between a radio station and a music style"
-    fields:
-      id:
-        type: uuid
-        pk: true
-      station_id:
-        type: uuid
         required: true
-        fk: radio_station.id
-      style_id:
-        type: uuid
+      primary_style_id:
+        type: string
         required: true
         fk: style.id
-      relevance_score:
-        type: decimal
+      secondary_style_ids:
+        type: string[]
+      descriptor_ids:
+        type: string[]
+
+  persisted_app_state:
+    label: "Persisted App State"
+    description: "Client-side session preferences and last visible graph state restored on application load"
+    fields:
+      version:
+        type: integer
+        required: true
+      selected_node_id:
+        type: string
+        fk: atlas_node.id
+      panel_open:
+        type: boolean
+        default: false
+      expanded_node_ids:
+        type: string[]
+      normalization_enabled:
+        type: boolean
+        default: false
+      normalization_aggression:
+        type: integer
+      fade_in_ms:
+        type: integer
+      fade_out_ms:
+        type: integer
 
 relations:
   - entity_a: style
-    entity_b: style_relation
+    entity_b: style
     cardinality: one_to_many
-    label: "connects through"
-    description: "A style can participate in many graph relations with other styles"
-
-  - entity_a: radio_station
-    entity_b: station_style
-    cardinality: one_to_many
-    label: "is mapped through"
-    description: "A radio station can be mapped to multiple music styles"
+    label: "parents canonically"
+    description: "A canonical style can have many child styles through parent_style_id"
 
   - entity_a: style
-    entity_b: station_style
+    entity_b: style_relation
     cardinality: one_to_many
-    label: "has mapped stations"
-    description: "A style can have multiple radio stations associated with it"
+    label: "connects semantically through"
+    description: "A style can participate in many typed cross-style relations"
+
+  - entity_a: style
+    entity_b: atlas_node
+    cardinality: one_to_many
+    label: "projects into"
+    description: "Canonical styles can project into one visible atlas node, while some atlas nodes are synthetic and have no source style"
+
+  - entity_a: atlas_node
+    entity_b: atlas_node
+    cardinality: one_to_many
+    label: "contains visually"
+    description: "Atlas nodes form the visible exploration hierarchy used by the graph and search path reveal"
+
+  - entity_a: style
+    entity_b: radio_station
+    cardinality: one_to_many
+    label: "is primary style for"
+    description: "Each station has one primary style and may also refer to additional related or descriptor styles"
+
+  - entity_a: atlas_node
+    entity_b: persisted_app_state
+    cardinality: one_to_many
+    label: "can be restored from"
+    description: "Persisted client state may restore one selected node and multiple expanded nodes on startup"

@@ -2,82 +2,96 @@ docType: ui-spec
 format_version: "0.0.3"
 
 metadata:
-  name: music-starfield
-  description: "Interactive atlas of music styles represented as a navigable graph. Users explore root genres and subgenres, open a selected style, and listen to public online radio stations associated with that style."
-  theme: "celestial atlas interface with premium dark mood and glowing constellation accents"
-  background: "deep space backdrop with subtle stars and atmospheric gradients"
+  name: music_starfield
+  description: "Interactive celestial atlas of music styles and public radio stations. Users explore a projected genre graph, search styles or stations, inspect a selected node, and play live streams with persistent audio controls."
+  theme: "celestial atlas interface with premium dark mood, brass highlights, scanline chrome, and glowing constellation accents"
+  background: "deep space backdrop with animated starfield and audio-reactive atmosphere"
   palette:
-    primary: "aged gold highlights for active UI elements"
-    surface: "near-black translucent panels with soft blur"
-    relax: "warm amber cluster color"
-    electronic: "cool blue cluster color"
-    rock: "muted crimson cluster color"
-    jazz: "violet cluster color"
+    primary: "aged gold highlights for active controls and framing"
+    surface: "near-black translucent panels with blur"
+    electronic: "cool blue constellation color"
+    rock: "muted crimson constellation color"
+    jazz: "violet constellation color"
+    classical: "sea-glass constellation color"
+    instrumental: "sage constellation color"
 
 screens:
   atlas_explorer:
     title: "Atlas Explorer"
-    purpose: "Main workspace for exploring the music-style graph, selecting a style node, opening its related radio stations, and controlling playback without leaving the map."
+    purpose: "Single-screen exploratory workspace where users pan and zoom the music atlas, expand visible branches, inspect styles, search the catalog, and keep listening while moving through the graph."
     blocks:
       - id: top_header
         columns: 12
-        purpose: "Top overlay header with application title, short atmospheric subtitle, and color legend for root style families."
+        purpose: "Top overlay with product title, atmospheric subtitle, and a search toggle action."
+
+      - id: search_overlay
+        columns: 12
+        purpose: "Command-palette style search layer opened from the header. Accepts free-text queries for style nodes, stations, or mood descriptors; groups results into Styles and Stations; previews the matched path on hover; and reveals plus selects the destination on click."
 
       - id: graph_canvas
         columns: 12
-        purpose: "Central interactive graph canvas showing root styles, substyles, and visible relationships between them. Supports pan, zoom, hover inspection, node expansion, node collapse, and node selection."
+        purpose: "Primary SVG atlas with force-positioned nodes and links. Shows only editorially visible branches plus required ancestors, supports pan and zoom, highlights search paths, pulses the currently playing branch, and allows expanding or collapsing sibling-limited branches."
 
       - id: hover_tooltip
         columns: 12
-        purpose: "Floating tooltip near the pointer with hovered node name, style level, related station count, and the next available interaction hint."
+        purpose: "Pointer-following tooltip for the hovered node with style name, translated level label, matched station count, and context-sensitive interaction hint."
 
-      - id: style_detail_drawer
+      - id: style_detail_panel
         columns: 12
-        purpose: "Right-side drawer opened for the currently selected style. Shows style name, style level label, optional note about child styles, and a list of playable public radio stations mapped to this style."
+        purpose: "Right-side inspection panel for the selected node. Displays level label, internal sector code, optional note that the node contains child styles, and all stations that match the node through primary, related, or descriptor ancestry."
         blocks:
-          - id: drawer_header
+          - id: panel_header
             columns: 12
-            purpose: "Top section with style level label, selected style name, and close action for the drawer."
+            purpose: "Selected node identity with level badge, node id, human-readable title, and close action."
 
-          - id: style_context_note
+          - id: hierarchy_note
             columns: 12
-            purpose: "Optional informational note explaining whether the selected style has child styles or belongs to a broader cluster."
+            purpose: "Conditional note shown when the selected node has children and can be expanded in the atlas."
 
-          - id: station_list
+          - id: station_cards
             columns: 12
-            purpose: "Scrollable list of radio station cards for the selected style."
-            blocks:
-              - id: station_card
-                columns: 12
-                purpose: "Radio station card showing station name, country label, bitrate label, current play state, and play or pause action."
+            purpose: "Scrollable stack of station cards. Each card exposes station name, optional editorial description, taxonomy labels for primary, related, and descriptor styles, country, bitrate, and a play or pause button with loading feedback."
+
+          - id: empty_station_state
+            columns: 12
+            purpose: "Fallback state shown when the selected node currently has no mapped radio transmissions."
 
       - id: persistent_player
         columns: 12
-        purpose: "Bottom mini-player that remains visible while browsing the graph. Shows current station name, current style context, playback state, pause and stop controls, and volume adjustment."
+        purpose: "Bottom docked player that appears only after a station has been selected. Persists while browsing, shows current style context, station name, optional live track metadata, animated waveform or spectrum, transport controls, and gain slider."
         blocks:
-          - id: playback_context
-            columns: 6
-            purpose: "Current listening context with active style label and active station name."
+          - id: player_context
+            columns: 4
+            purpose: "Current genre context, station title, and optional now-playing text from supported upstream metadata sources."
 
-          - id: playback_activity
+          - id: player_visualizer
+            columns: 3
+            purpose: "Live readout area with animated decorative waveform in idle or loading states and a real analyser-driven spectrum when audio data is available."
+
+          - id: player_transport
             columns: 2
-            purpose: "Compact visual playback indicator showing whether audio is currently active."
+            purpose: "Pause or resume, stop, and sound-settings actions with loading treatment for stream start and resume operations."
 
-          - id: playback_controls
-            columns: 2
-            purpose: "Pause or resume action and stop action for the active radio stream."
+          - id: player_gain
+            columns: 3
+            purpose: "Volume slider with textual gain-state feedback ranging from low to hot."
 
-          - id: volume_control
-            columns: 2
-            purpose: "Volume slider for the active radio stream."
-
-      - id: usage_hints
+      - id: sound_settings_modal
         columns: 12
-        purpose: "Small helper overlay for first-time users explaining graph navigation, style expansion, station selection, and map movement."
+        purpose: "Modal opened from the player for per-session audio shaping. Lets the user enable loudness normalization, tune normalization strength, and adjust fade-in and fade-out durations for station transitions."
+
+      - id: static_overlays
+        columns: 12
+        purpose: "Persistent decorative and assistive overlays including graph interaction hints and a compass ornament."
+
+interaction_notes:
+  - "Search results can target either atlas nodes or stations. Station results resolve to the most relevant atlas context path before opening the side panel."
+  - "Expanded branch state, selected node, side-panel visibility, and player sound settings are restored from local persisted app state on load."
+  - "The visible atlas is a projection of canonical taxonomy data and includes synthetic cluster nodes such as Club and Breakbeat to improve exploration clarity."
+  - "The player may fetch live metadata from supported providers such as SomaFM and Soundpark Deep while a station is active."
 
 detailing_philosophy:
-  core_principle: "User intent always takes priority over level guidelines"
-
+  core_principle: "Favor reusable product structure and observed interaction rules over low-level implementation detail."
   level_guidance:
-    exploration:
-      intent: "Discover the main screen and interaction model for graph-based music exploration"
+    implementation_handoff:
+      intent: "Enough precision for another agent to rebuild the single-screen flow, projected graph behavior, search UX, and audio-control model from the spec alone."

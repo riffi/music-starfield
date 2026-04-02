@@ -1,4 +1,0 @@
-interface:
-  display_name: "Spec Canvas"
-  short_description: "Draft, audit, and refine specs"
-  default_prompt: "Use $speccanvas to create or revise a Spec Canvas UI Spec or Data Spec from docs.speccanvas.dev."
