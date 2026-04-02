@@ -142,6 +142,15 @@ export const stationBindings: StationBinding[] = [
     primaryStyleId: 'dubstep',
   },
   {
+    id: 'r1-melodic-dubstep',
+    name: 'R1 Melodic Dubstep',
+    streamUrl: 'https://stream.zeno.fm/sgpeqtzkmzauv',
+    description: 'Melodic dubstep station also leaning into trap, chillstep, and drum & bass.',
+    countryLabel: 'BE',
+    bitrateLabel: 'MP3',
+    primaryStyleId: 'dubstep',
+  },
+  {
     id: 'ural-sound',
     name: 'Ural Sound',
     streamUrl: 'https://5.restream.one/1392_1',
@@ -332,6 +341,7 @@ export const stationBindings: StationBinding[] = [
     countryLabel: 'RU',
     bitrateLabel: '128k',
     primaryStyleId: 'breaks',
+    secondaryStyleIds: ['atmosphericbreaks'],
   },
   {
     id: 'atmospheric-breaks-radio',

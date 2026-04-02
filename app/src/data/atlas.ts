@@ -35,6 +35,7 @@ const CLUB_CLUSTER_ID = 'club'
 const CLUB_CLUSTER_CHILDREN = new Set(['house', 'techno'])
 const L4_PARENT_OVERRIDES: Partial<Record<(typeof styleTaxonomy)[number]['id'], string>> = {
   vocalchillout: 'chillout',
+  dubstep: BREAKBEAT_CLUSTER_ID,
 }
 
 const taxonomyById = Object.fromEntries(styleTaxonomy.map((taxon) => [taxon.id, taxon])) as Record<string, (typeof styleTaxonomy)[number]>
@@ -42,10 +43,22 @@ const visibleIds = new Set(styleTaxonomy.filter((taxon) => taxon.isAtlasVisible)
 
 for (const taxon of styleTaxonomy) {
   if (!visibleIds.has(taxon.id)) continue
-  let cursor = taxon.parentId
+  let cursor = L4_PARENT_OVERRIDES[taxon.id] ?? (
+    BREAKBEAT_CLUSTER_CHILDREN.has(taxon.id)
+      ? BREAKBEAT_CLUSTER_ID
+      : CLUB_CLUSTER_CHILDREN.has(taxon.id)
+        ? CLUB_CLUSTER_ID
+        : taxon.parentId
+  )
   while (cursor) {
     visibleIds.add(cursor)
-    cursor = taxonomyById[cursor]?.parentId
+    cursor = L4_PARENT_OVERRIDES[cursor] ?? (
+      BREAKBEAT_CLUSTER_CHILDREN.has(cursor)
+        ? BREAKBEAT_CLUSTER_ID
+        : CLUB_CLUSTER_CHILDREN.has(cursor)
+          ? CLUB_CLUSTER_ID
+          : taxonomyById[cursor]?.parentId
+    )
   }
 }
 

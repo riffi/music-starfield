@@ -118,7 +118,7 @@ export const styleTaxonomy: StyleTaxon[] = [
   { id: 'goatrance', name: 'Goa Trance', root: 'electronic', kind: 'genre', level: 3, parentId: 'trance', isAtlasVisible: true },
   { id: 'vocaltrance', name: 'Vocal Trance', root: 'electronic', kind: 'descriptor', level: 3, parentId: 'trance' },
   { id: 'futuregarage', name: 'Future Garage', root: 'electronic', kind: 'genre', level: 3, parentId: 'downtempo', isAtlasVisible: true },
-  { id: 'dubstep', name: 'Dubstep', root: 'electronic', kind: 'genre', level: 3, parentId: 'ukgarage' },
+  { id: 'dubstep', name: 'Dubstep', root: 'electronic', kind: 'genre', level: 3, parentId: 'ukgarage', isAtlasVisible: true },
   { id: 'atmosphericbreaks', name: 'Atmospheric Breaks', root: 'electronic', kind: 'style', level: 3, parentId: 'breaks', isAtlasVisible: true },
   { id: 'jungle', name: 'Jungle', root: 'electronic', kind: 'genre', level: 3, parentId: 'drumandbass', isAtlasVisible: true },
   { id: 'neurofunk', name: 'Neurofunk', root: 'electronic', kind: 'genre', level: 3, parentId: 'drumandbass', isAtlasVisible: true },
